@@ -1,3 +1,3 @@
-module DistributedCac
+module DistributedCalc
 
 go 1.23
