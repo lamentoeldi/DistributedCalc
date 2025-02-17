@@ -37,6 +37,10 @@ func (o *Orchestrator) GetTask(_ context.Context) (*models.Task, error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("got status code %d", res.StatusCode)
+	}
+
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
