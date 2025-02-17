@@ -1,28 +1,36 @@
 package async
 
 import (
-	"DistributedCalc/internal/agent/adapters/orchestrator"
 	"DistributedCalc/internal/agent/config"
 	"DistributedCalc/pkg/models"
 	"context"
 	"go.uber.org/zap"
+	"sync"
 	"time"
 )
+
+type Orchestrator interface {
+	GetTask(ctx context.Context) (*models.Task, error)
+	PostResult(ctx context.Context, result *models.TaskResult) error
+}
 
 type Calculator interface {
 	Evaluate(task *models.Task) (*models.TaskResult, error)
 }
 
 type TransportAsync struct {
-	o   *orchestrator.Orchestrator
-	c   Calculator
-	in  chan *models.Task
-	out chan *models.TaskResult
-	cfg *config.Config
-	log *zap.Logger
+	o        Orchestrator
+	c        Calculator
+	in       chan *models.Task
+	out      chan *models.TaskResult
+	cfg      *config.Config
+	log      *zap.Logger
+	onceRun  sync.Once
+	onceStop sync.Once
+	wg       sync.WaitGroup
 }
 
-func NewTransportAsync(cfg *config.Config, log *zap.Logger, o *orchestrator.Orchestrator, c Calculator, in chan *models.Task, out chan *models.TaskResult) *TransportAsync {
+func NewTransportAsync(cfg *config.Config, log *zap.Logger, o Orchestrator, c Calculator, in chan *models.Task, out chan *models.TaskResult) *TransportAsync {
 	return &TransportAsync{
 		o:   o,
 		in:  in,
@@ -34,16 +42,28 @@ func NewTransportAsync(cfg *config.Config, log *zap.Logger, o *orchestrator.Orch
 }
 
 // StartWorkers starts worker goroutines which take *models.Task from in, evaluate term and pass *models.TaskResult to out
-func (t *TransportAsync) StartWorkers() {
+func (t *TransportAsync) StartWorkers(ctx context.Context) {
+	t.wg.Add(t.cfg.WorkersLimit)
 	for range t.cfg.WorkersLimit {
 		go func() {
-			for r := range t.in {
-				res, err := t.c.Evaluate(r)
-				if err != nil {
-					t.log.Error(err.Error())
-					continue
+			defer t.wg.Done()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case r, ok := <-t.in:
+					if !ok {
+						continue
+					}
+
+					res, err := t.c.Evaluate(r)
+					if err != nil {
+						t.log.Error(err.Error())
+						continue
+					}
+					t.out <- res
 				}
-				t.out <- res
 			}
 		}()
 	}
@@ -62,15 +82,18 @@ func (t *TransportAsync) produce() {
 
 // consume uses long polling to receive new tasks from server and send them to in channel
 func (t *TransportAsync) consume(ctx context.Context) {
+	t.wg.Add(1)
+
 	ticker := time.NewTicker(t.cfg.PollTimeout)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
+			t.wg.Done()
 			return
 		case <-ticker.C:
-			task, err := t.o.GetTask(nil)
+			task, err := t.o.GetTask(ctx)
 			if err != nil {
 				t.log.Error(err.Error())
 				continue
@@ -82,13 +105,18 @@ func (t *TransportAsync) consume(ctx context.Context) {
 
 // Run starts consuming tasks from server
 func (t *TransportAsync) Run(ctx context.Context) {
-	t.StartWorkers()
-	go t.consume(ctx)
-	go t.produce()
+	t.onceRun.Do(func() {
+		t.StartWorkers(ctx)
+		go t.consume(ctx)
+		go t.produce()
+	})
 }
 
 // Shutdown closes channels which causes all workers to stop
 func (t *TransportAsync) Shutdown() {
-	close(t.out)
-	close(t.in)
+	t.onceStop.Do(func() {
+		t.wg.Wait()
+		close(t.out)
+		close(t.in)
+	})
 }

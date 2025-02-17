@@ -25,8 +25,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer logger.Sync()
 
-	api := orchestrator.NewOrchestrator(http.DefaultClient, cfg.Url)
+	api := orchestrator.NewOrchestrator(http.DefaultClient, cfg.Url, cfg.MaxRetries)
+	err = api.Ping()
+	if err != nil {
+		logger.Fatal("Failed to connect to orchestrator", zap.Error(err))
+	}
 
 	app := service.NewService()
 

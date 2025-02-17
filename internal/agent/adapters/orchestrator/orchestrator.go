@@ -5,19 +5,23 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type Orchestrator struct {
-	Client *http.Client
-	Url    string // protocol://host:port
+	Client  *http.Client
+	Url     string // protocol://host:port
+	Retries int
 }
 
-func NewOrchestrator(client *http.Client, url string) *Orchestrator {
+func NewOrchestrator(client *http.Client, url string, retries int) *Orchestrator {
 	return &Orchestrator{
-		Client: client,
-		Url:    url,
+		Client:  client,
+		Url:     url,
+		Retries: retries,
 	}
 }
 
@@ -57,12 +61,31 @@ func (o *Orchestrator) PostResult(_ context.Context, result *models.TaskResult) 
 	if err != nil {
 		return err
 	}
-	defer req.Body.Close()
 
-	_, err = o.Client.Do(req)
+	res, err := o.Client.Do(req)
 	if err != nil {
 		return err
 	}
 
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("got status code %d", res.StatusCode)
+	}
+
 	return nil
+}
+
+func (o *Orchestrator) Ping() error {
+	var err error
+	var res *http.Response
+
+	for i := 0; i < o.Retries; i++ {
+		time.Sleep(time.Duration(1<<i) * time.Second)
+		res, err = http.Get(o.Url + "/internal/ping")
+		if err == nil && res.StatusCode == http.StatusOK {
+			res.Body.Close()
+			return nil
+		}
+	}
+
+	return err
 }
