@@ -1,0 +1,152 @@
+openapi: 3.1.0
+info:
+  title: Distributed calculator API
+  description: Distributed calculator API
+  version: 1.0.0
+servers:
+  - url: 'http://localhost'
+paths:
+  /api/v1/calculate:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalculateRequest'
+      description: Add new expression to evaluate
+      responses:
+        201:
+          description: Expression successfully added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculateResponse'
+        400:
+          description: Request body is invalid
+        422:
+          description: Expression is invalid
+  /api/v1/expressions:
+    get:
+      description: Get all expressions
+      responses:
+        200:
+          description: Expressions successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expressions:
+                    $ref: '#/components/schemas/ExpressionsResponse'
+  /api/v1/expressions/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      description: Get expression by ID
+      responses:
+        200:
+          description: Expression successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expression:
+                    $ref: '#/components/schemas/Expression'
+        404:
+          description: Expression not found
+  /internal/task:
+    get:
+      description: Get task to process
+      responses:
+        200:
+          description: Task successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task:
+                    $ref: '#/components/schemas/Task'
+        404:
+          description: No tasks to process
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompletedTask'
+      description: Send task result to master node
+      responses:
+        200:
+          description: Result successfully sent
+        404:
+          description: This task did not exist
+        422:
+          description: Invalid data
+
+
+  
+components:
+  schemas:
+    Expression:
+      type: object
+      properties:
+        id:
+          type: int
+          example: 0
+        status:
+          type: string
+          example: "completed"
+        result: 
+          type: float
+          example: 6.0
+    CalculateRequest:
+      type: object
+      properties:
+        expression:
+          type: string
+          example: "2 + 2 * 2"
+    CalculateResponse:
+      type: object
+      properties:
+        id:
+          type: int
+          example: 0
+    ExpressionsResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/Expression'
+    Task:
+      type: object
+      properties:
+        id:
+          type: int
+          example: 0
+        arg1:
+          type: float
+          example: 3.5
+        arg2:
+          type: float
+          example: 2.0
+        operation:
+          type: string
+          example: "+"
+        operation_time:
+          type: float
+          example: 0.01
+    CompletedTask:
+      type: object
+      properties:
+        id:
+          type: int
+          example: 0
+        result:
+          type: float
+          example: 7.0

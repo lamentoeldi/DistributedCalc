@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  orchestrator:
+    build:
+      context:
+        ./cmd/orchestrator/
+      dockerfile:
+        ../../build/package/orchestrator/Dockerfile
+  agent:
+    build:
+      context:
+        ./cmd/agent/
+      dockerfile:
+        ../../build/package/agent/Dockerfile
