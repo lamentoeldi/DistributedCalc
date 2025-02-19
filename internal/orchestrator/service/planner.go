@@ -4,7 +4,8 @@ import (
 	"DistributedCalc/internal/orchestrator/config"
 	"DistributedCalc/pkg/models"
 	"context"
-	"fmt"
+	"errors"
+	"math"
 	"math/rand"
 	"sync"
 )
@@ -60,9 +61,12 @@ func (t *PlannerChan) PlanTask(_ context.Context, task *models.Task) (TaskPromis
 	case "*":
 		task.OperationTime = t.cfg.MultiplicationTime.Milliseconds()
 	case "/":
+		if math.Abs(task.Arg2) < 1e-9 {
+			return nil, models.ErrDivisionByZero
+		}
 		task.OperationTime = t.cfg.DivisionTime.Milliseconds()
 	default:
-		return nil, fmt.Errorf("unsupported operation type: %s", task.Operation)
+		return nil, errors.Join(models.ErrUnsupportedOperation, errors.New(task.Operation))
 	}
 
 	t.q.Enqueue(task)
@@ -82,5 +86,5 @@ func (t *PlannerChan) FinishTask(_ context.Context, res *models.TaskResult) erro
 		return nil
 	}
 
-	return fmt.Errorf("some error")
+	return models.ErrTaskDoesNotExist
 }

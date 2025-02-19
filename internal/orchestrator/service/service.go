@@ -3,9 +3,17 @@ package service
 import (
 	"DistributedCalc/pkg/models"
 	"context"
+	"errors"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"unicode"
+)
+
+const (
+	StatusPending   = "pending"
+	StatusCompleted = "completed"
+	StatusFailed    = "failed"
 )
 
 type TaskPlanner interface {
@@ -69,11 +77,42 @@ func (s *Service) StartEvaluation(_ context.Context, expression string) error {
 		return err
 	}
 
-	go func() {
-		s.evaluateAST(ast)
-	}()
+	exp := &models.Expression{
+		Id:     rand.Int(),
+		Status: StatusPending,
+		Result: 0,
+	}
+
+	err = s.r.Add(context.TODO(), exp)
+	if err != nil {
+		return err
+	}
+
+	go func(exp *models.Expression) {
+		res, err := s.evaluateAST(ast)
+		if err != nil {
+			exp.Status = StatusFailed
+			_ = s.r.Add(context.TODO(), exp)
+		}
+
+		exp.Status = StatusCompleted
+		exp.Result = res
+		_ = s.r.Add(context.TODO(), exp)
+	}(exp)
 
 	return nil
+}
+
+func (s *Service) Get(ctx context.Context, id int) (*models.Expression, error) {
+	return s.r.Get(ctx, id)
+}
+
+func (s *Service) GetAll(ctx context.Context) ([]*models.Expression, error) {
+	return s.r.GetAll(ctx)
+}
+
+func (s *Service) FinishTask(ctx context.Context, result *models.TaskResult) error {
+	return s.p.FinishTask(ctx, result)
 }
 
 type node struct {
@@ -105,7 +144,7 @@ func (s *Service) tokenize(expression string) ([]token, error) {
 	for i, r := range expression {
 		// Prevent '*2+3' or '2+3*'
 		if (i == 0 || i == len(expression)-1) && isOperator(r) {
-			return nil, fmt.Errorf("unexpected operator at the beginning or end of expression: %c", r)
+			return nil, errors.Join(models.ErrInvalidExpression, fmt.Errorf("unexpected operator at the beginning or end of expression"))
 		}
 
 		if unicode.IsDigit(r) {
@@ -114,7 +153,7 @@ func (s *Service) tokenize(expression string) ([]token, error) {
 		} else if r == '.' {
 			// Prevent '3.14.2'
 			if dotEncountered {
-				return nil, fmt.Errorf("multiple decimal points in the same number: %s", expression)
+				return nil, errors.Join(models.ErrInvalidExpression, fmt.Errorf("multiple decimal points in the same number"))
 			}
 			currentToken.tokenType = number
 			currentToken.value += string(r)
@@ -126,7 +165,7 @@ func (s *Service) tokenize(expression string) ([]token, error) {
 			}
 			if isOperator(r) {
 				if isOperator(previousRune) {
-					return nil, fmt.Errorf("multiple operators in a row: %c", previousRune)
+					return nil, errors.Join(models.ErrInvalidExpression, fmt.Errorf("multiple sequent operators"))
 				}
 
 				currentToken.tokenType = operator
@@ -137,7 +176,7 @@ func (s *Service) tokenize(expression string) ([]token, error) {
 			} else if isParenthesis(r) {
 				// Prevent '2+()+3'
 				if isParenthesis(r) && isParenthesis(previousRune) && r != previousRune {
-					return nil, fmt.Errorf("empty parentheses: %c", previousRune)
+					return nil, errors.Join(models.ErrInvalidExpression, fmt.Errorf("empty parentheses: %c", previousRune))
 				}
 
 				currentToken.tokenType = parenthesis
@@ -152,7 +191,7 @@ func (s *Service) tokenize(expression string) ([]token, error) {
 					parenthesisCount--
 				}
 			} else {
-				return nil, fmt.Errorf("invalid character: %c", r)
+				return nil, errors.Join(models.ErrInvalidExpression, fmt.Errorf("invalid character: %c", r))
 			}
 		}
 
@@ -164,7 +203,7 @@ func (s *Service) tokenize(expression string) ([]token, error) {
 	}
 
 	if parenthesisCount != 0 {
-		return nil, fmt.Errorf("parenthesis count mismatch")
+		return nil, errors.Join(models.ErrInvalidExpression, fmt.Errorf("invalid parenthesis"))
 	}
 
 	return tokens, nil
@@ -252,7 +291,7 @@ func (s *Service) buildAST(tokens []token) (*node, error) {
 		return operandStack[0], nil
 	}
 
-	return nil, fmt.Errorf("invalid expression")
+	return nil, models.ErrInvalidExpression
 }
 
 func (s *Service) evaluateAST(node *node) (float64, error) {

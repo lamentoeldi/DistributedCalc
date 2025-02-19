@@ -2,6 +2,7 @@ package main
 
 import (
 	"DistributedCalc/internal/orchestrator/config"
+	"DistributedCalc/internal/orchestrator/repository/memory"
 	"DistributedCalc/internal/orchestrator/service"
 	"DistributedCalc/internal/orchestrator/transport/http"
 	"DistributedCalc/pkg/models"
@@ -26,12 +27,16 @@ func main() {
 
 	queue := service.NewQueue[models.Task](64)
 
+	rep := memory.NewRepositoryMemory()
+	planner := service.NewPlannerChan(cfg, queue)
+	app := service.NewService(rep, planner)
+
 	transportCfg := &http.TransportHttpConfig{
 		Host: cfg.Host,
 		Port: cfg.Port,
 	}
 
-	transport := http.NewTransportHttp(nil, logger, transportCfg, queue)
+	transport := http.NewTransportHttp(app, logger, transportCfg, queue)
 
 	transport.Run()
 

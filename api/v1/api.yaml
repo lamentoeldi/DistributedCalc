@@ -86,10 +86,10 @@ paths:
       responses:
         200:
           description: Result successfully sent
+        400:
+          description: Invalid request body
         404:
-          description: This task did not exist
-        422:
-          description: Invalid data
+          description: This task does not exist
   /internal/ping:
     get:
       description: Ping master node to ensure it is running

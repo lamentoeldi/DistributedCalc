@@ -288,3 +288,140 @@ func TestService_evaluateAST(t *testing.T) {
 		})
 	}
 }
+
+func TestService_StartEvaluation(t *testing.T) {
+	cfg := &config.Config{
+		Host: "",
+		Port: 0,
+
+		AdditionTime:       100 * time.Millisecond,
+		SubtractionTime:    500 * time.Millisecond,
+		MultiplicationTime: 2000 * time.Millisecond,
+		DivisionTime:       1000 * time.Millisecond,
+	}
+
+	r := memory.NewRepositoryMemory()
+	q := NewQueue[models.Task](64)
+	p := NewPlannerChan(cfg, q)
+	s := NewService(r, p)
+
+	cases := []struct {
+		name       string
+		expression string
+		expected   float64
+		wantErr    bool
+	}{
+		{
+			name:       "valid expression",
+			expression: "2+2",
+			wantErr:    false,
+		},
+		{
+			name:       "invalid expression",
+			expression: "2+2/",
+			wantErr:    true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := s.StartEvaluation(context.Background(), tc.expression)
+			if tc.wantErr == false && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+
+			if tc.wantErr == true && err == nil {
+				t.Error("expected error, got none")
+			}
+		})
+	}
+}
+
+func TestService_Get(t *testing.T) {
+	cfg := &config.Config{
+		Host: "",
+		Port: 0,
+
+		AdditionTime:       100 * time.Millisecond,
+		SubtractionTime:    500 * time.Millisecond,
+		MultiplicationTime: 2000 * time.Millisecond,
+		DivisionTime:       1000 * time.Millisecond,
+	}
+
+	r := memory.NewRepositoryMemory()
+	q := NewQueue[models.Task](64)
+	p := NewPlannerChan(cfg, q)
+	s := NewService(r, p)
+
+	cases := []struct {
+		name    string
+		id      int
+		wantErr bool
+	}{
+		{
+			name:    "success",
+			id:      1,
+			wantErr: false,
+		},
+		{
+			name:    "expression not found",
+			id:      100,
+			wantErr: true,
+		},
+	}
+
+	err := s.r.Add(context.Background(), &models.Expression{
+		Id:     1,
+		Status: "testing",
+		Result: 0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := s.Get(context.Background(), tc.id)
+			if tc.wantErr == false && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+
+			if tc.wantErr == true && err == nil {
+				t.Error("expected error, got none")
+			}
+		})
+	}
+}
+
+func TestService_GetAll(t *testing.T) {
+	cfg := &config.Config{
+		Host: "",
+		Port: 0,
+
+		AdditionTime:       100 * time.Millisecond,
+		SubtractionTime:    500 * time.Millisecond,
+		MultiplicationTime: 2000 * time.Millisecond,
+		DivisionTime:       1000 * time.Millisecond,
+	}
+
+	r := memory.NewRepositoryMemory()
+	q := NewQueue[models.Task](64)
+	p := NewPlannerChan(cfg, q)
+	s := NewService(r, p)
+
+	exp := &models.Expression{
+		Id:     0,
+		Status: "testing",
+		Result: 0,
+	}
+
+	err := s.r.Add(context.Background(), exp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = s.GetAll(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

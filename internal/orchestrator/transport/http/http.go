@@ -12,6 +12,9 @@ import (
 
 type Service interface {
 	StartEvaluation(ctx context.Context, expression string) error
+	Get(ctx context.Context, id int) (*models.Expression, error)
+	GetAll(ctx context.Context) ([]*models.Expression, error)
+	FinishTask(ctx context.Context, result *models.TaskResult) error
 }
 
 type Queue[T any] interface {
@@ -45,7 +48,7 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig, queu
 	}
 
 	t.mux.HandleFunc("/internal/ping", t.handlePing)
-	t.mux.HandleFunc("/internal/task", t.handleTask)
+	t.mux.Handle("/internal/task", mwLogger(log, http.HandlerFunc(t.handleTask)))
 
 	return t
 }
@@ -59,19 +62,24 @@ func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		t.handleGetTask(w, r)
 	case "POST":
-		http.Error(w, "not implemented", http.StatusNotImplemented)
+		t.handlePostResult(w, r)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
 func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
+	reqID := r.Context().Value("request_id")
+	log := t.log.With(zap.Any("request_id", reqID))
+
 	task, err := t.q.Dequeue()
 	switch {
 	case errors.Is(err, models.ErrNoTasks):
+		log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	case err != nil:
+		log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -82,6 +90,7 @@ func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
 		Task: task,
 	})
 	if err != nil {
+		log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -89,7 +98,36 @@ func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(data)
 	if err != nil {
+		log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (t *TransportHttp) handlePostResult(w http.ResponseWriter, r *http.Request) {
+	reqID := r.Context().Value("request_id")
+	log := t.log.With(zap.Any("request_id", reqID))
+
+	defer r.Body.Close()
+
+	var result *models.TaskResult
+
+	err := json.NewDecoder(r.Body).Decode(&result)
+	if err != nil {
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = t.s.FinishTask(r.Context(), result)
+	switch {
+	case errors.Is(err, models.ErrTaskDoesNotExist):
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	case err != nil:
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
