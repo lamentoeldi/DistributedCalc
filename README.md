@@ -21,6 +21,7 @@ The system consists of nodes of 2 types:
 4. [Examples of Use](#examples-of-use)
    - [/api/v1/calculate](#apiv1calculate)
    - [/api/v1/expressions](#apiv1expressions)
+   - [/api/v1/expressions/{id}](#apiv1expressionsid)
 5. [Future Plans](#future-plans)
   
 
@@ -110,13 +111,13 @@ NOTICE: Do not change host if you run in docker, otherwise it may not work prope
 
 `LOG_LEVEL`: Level of logging (default: `info`)
 
-`TIME_ADDITION_MS`: Time which `+` operation takes (default: `1`)
+`TIME_ADDITION_MS`: Time in milliseconds which `+` operation takes (default: `1`)
 
-`TIME_SUBTRACTION_MS`: Time which `-` operation takes (default: `1`)
+`TIME_SUBTRACTION_MS`: Time in milliseconds which `-` operation takes (default: `1`)
 
-`TIME_MULTIPLICATION_MS`: Time which `*` operation takes (default: `1`)
+`TIME_MULTIPLICATION_MS`: Time in milliseconds which `*` operation takes (default: `1`)
 
-`TIME_DIVISION_MS`: Time which `/` operation takes (default: `1`)
+`TIME_DIVISION_MS`: Time in milliseconds which `/` operation takes (default: `1`)
 
 ## Agent
 Agent is a worker node of calculation cluster
@@ -134,9 +135,9 @@ Agent can be configured via environment variables
 
 `POLL_TIMEOUT`: Polling interval in milliseconds (default: `50`)
 
-`MAX_RETRIES`: Maximum number of retries on failed requests (default: `3`)
+`MAX_RETRIES`: Maximum retries on failed requests (default: `3`)
 
-`MASTER_URL`: Orchestrator URL in protocol://host:port format (default: `http://localhost:8080`)
+`MASTER_URL`: Orchestrator URL in `protocol://host:port` format (default: `http://localhost:8080`)
 
 # Good to Know
 
@@ -144,17 +145,17 @@ Agent can be configured via environment variables
 
 - Currently, the system keeps all data in-memory, that means that all data will be lost on restart
 - Currently, the system is stateful, that means that data you receive depends on which node you have accessed
-- Agents are using long polling to receive tasks from orchestrator
+- Agents use long polling to receive tasks from orchestrator
 - It is possible to use proxy like [envoy](https://www.envoyproxy.io), 
 [nginx](https://nginx.org) or 
-[traefik](https://doc.traefik.io/traefik/) to balance incoming requests load between running nodes
+[traefik](https://doc.traefik.io/traefik/) to balance incoming requests between running nodes
 - If result of expressions has more than `8` decimal places, they are thrown away
 
 ## Expression
-1. During the evaluation, field `result` in Expression schema if `0` until expression is evaluated
+1. During the evaluation, field `result` in Expression schema is `0` until expression is evaluated
 2. May have several statuses:
    - `pending`: the expression is being processed
-   - `completed`: the expression is processed
+   - `completed`: the expression is processed and result is ready for use
    - `failed`: the system failed to process the expression
 
 # Examples of Use
@@ -184,7 +185,8 @@ Content-Type: application/json
 `id`: int 
 
 ## /api/v1/expressions
-Receive all expressions evaluated by system
+Receive all expressions from orchestrator store
+- Currently, does not support pagination, just returns all expressions kept in the store
 
 ### Request
 ```http request
@@ -235,3 +237,7 @@ GET http://localhost:8080/api/v1/expressions/123
 `result`: double
 
 # Future Plans
+
+- Implement durable task queue using message broker (RabbitMQ, NATS, Redis, etc.)
+- Implement persistent data storage using database (PostgreSQL, SQLite, MySQL, etc.)
+- Implement pagination
