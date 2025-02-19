@@ -84,7 +84,7 @@ func (o *Orchestrator) Ping() error {
 	var err error
 	var res *http.Response
 
-	for i := 0; i < o.Retries; i++ {
+	for i := 0; i <= o.Retries; i++ {
 		time.Sleep(time.Duration(1<<i) * time.Second)
 		res, err = http.Get(o.Url + "/internal/ping")
 		if err == nil && res.StatusCode == http.StatusOK {

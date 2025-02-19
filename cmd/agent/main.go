@@ -19,7 +19,11 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	cfg := config.NewConfig()
+	cfg, err := config.NewConfig()
+	if err != nil {
+		lg, _ := zap.NewProduction()
+		lg.Fatal(err.Error())
+	}
 
 	logConfig := zap.NewProductionConfig()
 	logConfig.Level = zap.NewAtomicLevelAt(cfg.LogLevel)

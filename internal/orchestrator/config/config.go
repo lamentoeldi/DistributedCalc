@@ -1,9 +1,15 @@
 package config
 
 import (
+	"fmt"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
 	"time"
+)
+
+var (
+	errInvalidPort      = fmt.Errorf("port must be number between 1 and 65535")
+	errInvalidSleepTime = fmt.Errorf("sleep time must be positive")
 )
 
 type Config struct {
@@ -18,7 +24,7 @@ type Config struct {
 	LogLevel zapcore.Level
 }
 
-func NewConfig() *Config {
+func NewConfig() (*Config, error) {
 	viper.AutomaticEnv()
 
 	host := viper.GetString("host")
@@ -60,6 +66,14 @@ func NewConfig() *Config {
 		l = zapcore.InfoLevel
 	}
 
+	if port < 1 || port > 65536 {
+		return nil, errInvalidPort
+	}
+
+	if additionTime < 0 || subtractionTime < 0 || multiplicationTime < 0 || divisionTime < 0 {
+		return nil, errInvalidSleepTime
+	}
+
 	return &Config{
 		Host:               host,
 		Port:               port,
@@ -68,5 +82,5 @@ func NewConfig() *Config {
 		MultiplicationTime: time.Duration(multiplicationTime) * time.Millisecond,
 		DivisionTime:       time.Duration(divisionTime) * time.Millisecond,
 		LogLevel:           l,
-	}
+	}, nil
 }

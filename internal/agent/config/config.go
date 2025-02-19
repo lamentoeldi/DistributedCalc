@@ -1,9 +1,16 @@
 package config
 
 import (
+	"fmt"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
 	"time"
+)
+
+var (
+	errInvalidTimeout      = fmt.Errorf("poll_timeout must be positive integer")
+	errInvalidWorkersLimit = fmt.Errorf("computing_power must be positive integer")
+	errInvalidMaxRetries   = fmt.Errorf("max_retries must be positive integer")
 )
 
 type Config struct {
@@ -15,7 +22,7 @@ type Config struct {
 	LogLevel zapcore.Level
 }
 
-func NewConfig() *Config {
+func NewConfig() (*Config, error) {
 	viper.AutomaticEnv()
 
 	url := viper.GetString("master_url")
@@ -46,6 +53,18 @@ func NewConfig() *Config {
 		l = zapcore.InfoLevel
 	}
 
+	if pollTimeout < 0 {
+		return nil, errInvalidTimeout
+	}
+
+	if workersLimit < 1 {
+		return nil, errInvalidWorkersLimit
+	}
+
+	if maxRetries < 0 {
+		return nil, errInvalidMaxRetries
+	}
+
 	cfg := &Config{
 		PollTimeout:  time.Duration(pollTimeout) * time.Millisecond,
 		WorkersLimit: workersLimit,
@@ -54,5 +73,5 @@ func NewConfig() *Config {
 		LogLevel:     l,
 	}
 
-	return cfg
+	return cfg, nil
 }
