@@ -95,6 +95,7 @@ func (s *Service) StartEvaluation(_ context.Context, expression string) (int, er
 		if err != nil {
 			exp.Status = StatusFailed
 			_ = s.r.Add(context.TODO(), exp)
+			return
 		}
 
 		exp.Status = StatusCompleted
