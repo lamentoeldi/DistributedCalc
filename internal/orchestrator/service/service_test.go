@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"testing"
+	"time"
 )
 
 func TestService_tokenize(t *testing.T) {
@@ -164,6 +165,11 @@ func TestService_evaluateAST(t *testing.T) {
 	cfg := &config.Config{
 		Host: "",
 		Port: 0,
+
+		AdditionTime:       100 * time.Millisecond,
+		SubtractionTime:    500 * time.Millisecond,
+		MultiplicationTime: 2000 * time.Millisecond,
+		DivisionTime:       1000 * time.Millisecond,
 	}
 
 	r := memory.NewRepositoryMemory()
@@ -223,12 +229,15 @@ func TestService_evaluateAST(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			go func() {
 				for {
 					task, err := q.Dequeue()
 					if err != nil {
 						continue
 					}
+
+					time.Sleep(time.Duration(task.OperationTime) * time.Millisecond)
 
 					res := &models.TaskResult{
 						Id: task.Id,
@@ -275,7 +284,7 @@ func TestService_evaluateAST(t *testing.T) {
 				t.Errorf("expected %f, got %f", tc.expected, res)
 			}
 
-			log.Printf("calculated value: %v", res)
+			log.Printf("calculated value: %.2f for %s", res, tc.name)
 		})
 	}
 }

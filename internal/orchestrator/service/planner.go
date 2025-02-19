@@ -52,8 +52,20 @@ func (t *PlannerChan) PlanTask(_ context.Context, task *models.Task) (TaskPromis
 
 	task.Id = id
 
-	t.q.Enqueue(task)
+	switch task.Operation {
+	case "+":
+		task.OperationTime = t.cfg.AdditionTime.Milliseconds()
+	case "-":
+		task.OperationTime = t.cfg.SubtractionTime.Milliseconds()
+	case "*":
+		task.OperationTime = t.cfg.MultiplicationTime.Milliseconds()
+	case "/":
+		task.OperationTime = t.cfg.DivisionTime.Milliseconds()
+	default:
+		return nil, fmt.Errorf("unsupported operation type: %s", task.Operation)
+	}
 
+	t.q.Enqueue(task)
 	return &PromiseChan{
 		ch: ch,
 	}, nil
