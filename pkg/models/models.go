@@ -12,3 +12,9 @@ type TaskResult struct {
 	Id     int     `json:"id"`
 	Result float64 `json:"result"`
 }
+
+type Expression struct {
+	Id     int     `json:"id"`
+	Status string  `json:"status"`
+	Result float64 `json:"result"`
+}

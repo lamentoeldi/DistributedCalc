@@ -10,8 +10,8 @@ import (
 	"net/http"
 )
 
-type Calculator interface {
-	Evaluate(ctx context.Context, expression string) (float64, error)
+type Service interface {
+	StartEvaluation(ctx context.Context, expression string) error
 }
 
 type Queue[T any] interface {
@@ -25,8 +25,8 @@ type TransportHttpConfig struct {
 }
 
 type TransportHttp struct {
-	Calculator
-	Queue[models.Task]
+	s      Service
+	q      Queue[models.Task]
 	mux    *http.ServeMux
 	server *http.Server
 	log    *zap.Logger
@@ -34,14 +34,14 @@ type TransportHttp struct {
 	Port   int
 }
 
-func NewTransportHttp(calculator Calculator, log *zap.Logger, cfg *TransportHttpConfig, queue Queue[models.Task]) *TransportHttp {
+func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig, queue Queue[models.Task]) *TransportHttp {
 	t := &TransportHttp{
-		Calculator: calculator,
-		Queue:      queue,
-		mux:        http.NewServeMux(),
-		log:        log,
-		Host:       cfg.Host,
-		Port:       cfg.Port,
+		s:    s,
+		q:    queue,
+		mux:  http.NewServeMux(),
+		log:  log,
+		Host: cfg.Host,
+		Port: cfg.Port,
 	}
 
 	t.mux.HandleFunc("/internal/ping", t.handlePing)
@@ -66,7 +66,7 @@ func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
-	task, err := t.Queue.Dequeue()
+	task, err := t.q.Dequeue()
 	switch {
 	case errors.Is(err, models.ErrNoTasks):
 		http.Error(w, err.Error(), http.StatusNotFound)

@@ -1,13 +1,18 @@
 package service
 
 import (
+	"DistributedCalc/internal/orchestrator/config"
+	"DistributedCalc/internal/orchestrator/repository/memory"
 	"DistributedCalc/pkg/models"
+	"context"
 	"fmt"
+	"log"
 	"testing"
-	"time"
 )
 
-func TestTokenize(t *testing.T) {
+func TestService_tokenize(t *testing.T) {
+	s := NewService(nil, nil)
+
 	cases := []struct {
 		name    string
 		exp     string
@@ -82,7 +87,7 @@ func TestTokenize(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokens, err := tokenize(tc.exp)
+			tokens, err := s.tokenize(tc.exp)
 			fmt.Println("tokens: ", tokens)
 			if tc.wantErr == false && err != nil {
 				t.Errorf("expected no error, got %v", err)
@@ -94,7 +99,9 @@ func TestTokenize(t *testing.T) {
 	}
 }
 
-func TestBuildAST(t *testing.T) {
+func TestService_buildAST(t *testing.T) {
+	s := NewService(nil, nil)
+
 	cases := []struct {
 		name       string
 		expression string
@@ -135,12 +142,12 @@ func TestBuildAST(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokens, err := tokenize(tc.expression)
+			tokens, err := s.tokenize(tc.expression)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			ast, err := buildAST(tokens)
+			ast, err := s.buildAST(tokens)
 			fmt.Println(*ast)
 			if tc.wantErr == false && err != nil {
 				t.Errorf("expected no error, got %v", err)
@@ -149,80 +156,21 @@ func TestBuildAST(t *testing.T) {
 			if tc.wantErr == true && err == nil {
 				t.Error("expected error, got none")
 			}
-
-			//res, err := evaluateAST(ast)
-			//if int(tc.expected*1000) != int(res*1000) {
-			//	t.Errorf("expected %v, got %v", tc.expected, res)
-			//}
-			//
-			//if tc.wantErr == false && err != nil {
-			//	t.Errorf("expected no error, got %v", err)
-			//}
-			//
-			//if tc.wantErr == true && err == nil {
-			//	t.Error("expected error, got none")
-			//}
 		})
 	}
 }
 
-func TestParseAST(t *testing.T) {
-	cases := []struct {
-		name       string
-		expression string
-		expected   float64
-		wantErr    bool
-	}{
-		{
-			name:       "simple expression",
-			expression: "2+2",
-			expected:   4,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with parenthesis",
-			expression: "(2+2)*3",
-			expected:   12,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with operator priority",
-			expression: "2*2+3",
-			expected:   7,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with float numbers",
-			expression: "3.14+2",
-			expected:   5.14,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with nested parenthesis",
-			expression: "((2+3)*2)+1",
-			expected:   11,
-			wantErr:    false,
-		},
+func TestService_evaluateAST(t *testing.T) {
+	cfg := &config.Config{
+		Host: "",
+		Port: 0,
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			tokens, err := tokenize(tc.expression)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+	r := memory.NewRepositoryMemory()
+	q := NewQueue[models.Task](64)
+	p := NewPlannerChan(cfg, q)
+	s := NewService(r, p)
 
-			ast, err := buildAST(tokens)
-			if tc.wantErr == false && err != nil {
-				t.Errorf("expected no error, got %v", err)
-			}
-
-			walkAST(ast)
-		})
-	}
-}
-
-func TestEvaluateAST(t *testing.T) {
 	cases := []struct {
 		name       string
 		expression string
@@ -275,53 +223,59 @@ func TestEvaluateAST(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokens, err := tokenize(tc.expression)
+			go func() {
+				for {
+					task, err := q.Dequeue()
+					if err != nil {
+						continue
+					}
+
+					res := &models.TaskResult{
+						Id: task.Id,
+					}
+					switch task.Operation {
+					case "+":
+						res.Result = task.Arg1 + task.Arg2
+					case "-":
+						res.Result = task.Arg1 - task.Arg2
+					case "*":
+						res.Result = task.Arg1 * task.Arg2
+					case "/":
+						res.Result = task.Arg1 / task.Arg2
+					}
+
+					err = s.p.FinishTask(context.TODO(), res)
+					if err != nil {
+						log.Printf("Error finishing task %d: %v", task.Id, err)
+						continue
+					}
+				}
+			}()
+
+			tokens, err := s.tokenize(tc.expression)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			ast, err := buildAST(tokens)
+			ast, err := s.buildAST(tokens)
 			if tc.wantErr == false && err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
 
-			ch := make(chan *models.Task, 64)
-			rch := make(chan *models.TaskResult, 64)
-
-			go func() {
-				// Run 4 test workers
-				for range 4 {
-					go func() {
-						for task := range ch {
-							var res float64
-							switch task.Operation {
-							case "+":
-								res = task.Arg1 + task.Arg2
-							case "-":
-								res = task.Arg1 - task.Arg2
-							case "*":
-								res = task.Arg1 * task.Arg2
-							case "/":
-								res = task.Arg1 / task.Arg2
-							}
-
-							rch <- &models.TaskResult{
-								Id:     0,
-								Result: res,
-							}
-
-							time.Sleep(1 * time.Second)
-						}
-					}()
-				}
-			}()
-
-			res, err := evaluateAST(ast, ch, rch)
+			res, err := s.evaluateAST(ast)
 			if tc.wantErr == false && err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
 
-			fmt.Println(res)
+			if tc.wantErr == true && err == nil {
+				t.Error("expected error, got none")
+			}
+
+			if int(tc.expected*1000) != int(res*1000) {
+				t.Errorf("expected %f, got %f", tc.expected, res)
+			}
+
+			log.Printf("calculated value: %v", res)
 		})
 	}
 }
