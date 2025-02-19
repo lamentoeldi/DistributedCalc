@@ -20,6 +20,10 @@ func NewConfig() *Config {
 	workersLimit := viper.GetInt("computing_power")
 	maxRetries := viper.GetInt("max_retries")
 
+	if url == "" {
+		url = "http://localhost:8080"
+	}
+
 	if pollTimeout == 0 {
 		pollTimeout = 50
 	}

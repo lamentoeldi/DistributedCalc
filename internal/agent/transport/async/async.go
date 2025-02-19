@@ -4,6 +4,7 @@ import (
 	"DistributedCalc/internal/agent/config"
 	"DistributedCalc/pkg/models"
 	"context"
+	"errors"
 	"go.uber.org/zap"
 	"sync"
 	"time"
@@ -95,8 +96,12 @@ func (t *TransportAsync) consume(ctx context.Context) {
 		case <-ticker.C:
 			task, err := t.o.GetTask(ctx)
 			if err != nil {
-				t.log.Error(err.Error())
-				continue
+				switch {
+				case errors.Is(err, models.ErrNoTasks):
+				default:
+					t.log.Error(err.Error())
+				}
+				break
 			}
 			t.in <- task
 		}

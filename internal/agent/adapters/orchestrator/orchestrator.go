@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 )
@@ -38,21 +37,24 @@ func (o *Orchestrator) GetTask(_ context.Context) (*models.Task, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("got status code %d", res.StatusCode)
+		switch res.StatusCode {
+		case http.StatusNotFound:
+			return nil, models.ErrNoTasks
+		default:
+			return nil, fmt.Errorf("got status code %d", res.StatusCode)
+		}
 	}
 
-	data, err := io.ReadAll(res.Body)
+	task := &struct {
+		Task *models.Task `json:"task"`
+	}{}
+
+	err = json.NewDecoder(res.Body).Decode(&task)
 	if err != nil {
 		return nil, err
 	}
 
-	var task *models.Task
-	err = json.Unmarshal(data, &task)
-	if err != nil {
-		return nil, err
-	}
-
-	return task, err
+	return task.Task, err
 }
 
 func (o *Orchestrator) PostResult(_ context.Context, result *models.TaskResult) error {
