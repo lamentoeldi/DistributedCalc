@@ -66,26 +66,28 @@ func NewService(r Repository, p TaskPlanner) *Service {
 	}
 }
 
-func (s *Service) StartEvaluation(_ context.Context, expression string) error {
+func (s *Service) StartEvaluation(_ context.Context, expression string) (int, error) {
 	tokens, err := s.tokenize(expression)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	ast, err := s.buildAST(tokens)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
+	id := rand.Int()
+
 	exp := &models.Expression{
-		Id:     rand.Int(),
+		Id:     id,
 		Status: StatusPending,
 		Result: 0,
 	}
 
 	err = s.r.Add(context.TODO(), exp)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	go func(exp *models.Expression) {
@@ -100,7 +102,7 @@ func (s *Service) StartEvaluation(_ context.Context, expression string) error {
 		_ = s.r.Add(context.TODO(), exp)
 	}(exp)
 
-	return nil
+	return id, nil
 }
 
 func (s *Service) Get(ctx context.Context, id int) (*models.Expression, error) {

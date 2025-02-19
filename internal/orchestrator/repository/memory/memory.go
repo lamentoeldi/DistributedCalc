@@ -22,14 +22,14 @@ func (r *RepositoryMemory) Add(_ context.Context, exp *models.Expression) error 
 func (r *RepositoryMemory) Get(_ context.Context, id int) (*models.Expression, error) {
 	val, ok := r.m.Load(id)
 	if !ok {
-		return nil, models.ErrTaskDoesNotExist
+		return nil, models.ErrExpressionDoesNotExist
 	}
 
 	if exp, ok := val.(*models.Expression); ok {
 		return exp, nil
 	}
 
-	return nil, models.ErrTaskDoesNotExist
+	return nil, models.ErrExpressionDoesNotExist
 }
 
 func (r *RepositoryMemory) GetAll(_ context.Context) ([]*models.Expression, error) {
@@ -42,7 +42,7 @@ func (r *RepositoryMemory) GetAll(_ context.Context) ([]*models.Expression, erro
 			return true
 		}
 
-		err = models.ErrTaskDoesNotExist
+		err = models.ErrNoExpressions
 		return false
 	})
 

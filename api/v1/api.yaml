@@ -39,6 +39,8 @@ paths:
                 properties:
                   expressions:
                     $ref: '#/components/schemas/ExpressionsResponse'
+        404:
+          description: No expressions are being processed
   /api/v1/expressions/{id}:
     get:
       parameters:

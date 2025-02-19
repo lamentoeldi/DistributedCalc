@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 type Service interface {
-	StartEvaluation(ctx context.Context, expression string) error
+	StartEvaluation(ctx context.Context, expression string) (int, error)
 	Get(ctx context.Context, id int) (*models.Expression, error)
 	GetAll(ctx context.Context) ([]*models.Expression, error)
 	FinishTask(ctx context.Context, result *models.TaskResult) error
@@ -47,6 +49,10 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig, queu
 		Port: cfg.Port,
 	}
 
+	t.mux.Handle("/api/v1/calculate", mwLogger(log, http.HandlerFunc(t.handleCalculate)))
+	t.mux.Handle("/api/v1/expressions", mwLogger(log, http.HandlerFunc(t.handleExpressions)))
+	t.mux.Handle("/api/v1/expressions/", mwLogger(log, http.HandlerFunc(t.handleExpression)))
+
 	t.mux.HandleFunc("/internal/ping", t.handlePing)
 	t.mux.Handle("/internal/task", mwLogger(log, http.HandlerFunc(t.handleTask)))
 
@@ -55,6 +61,137 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig, queu
 
 func (t *TransportHttp) handlePing(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
+}
+
+func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) {
+	reqID := r.Context().Value("request_id")
+	log := t.log.With(zap.Any("request_id", reqID))
+
+	if r.Method != "POST" {
+		http.Error(w, r.Method, http.StatusMethodNotAllowed)
+	}
+
+	var exp *models.Calculation
+	err := json.NewDecoder(r.Body).Decode(&exp)
+	if err != nil {
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	id, err := t.s.StartEvaluation(r.Context(), exp.Expression)
+	if err != nil {
+		log.Error(err.Error())
+
+		switch {
+		case errors.Is(err, models.ErrInvalidExpression):
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		return
+	}
+
+	data, err := json.Marshal(map[string]any{
+		"id": id,
+	})
+	if err != nil {
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	_, err = w.Write(data)
+	if err != nil {
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request) {
+	reqID := r.Context().Value("request_id")
+	log := t.log.With(zap.Any("request_id", reqID))
+
+	if r.Method != "GET" {
+		http.Error(w, r.Method, http.StatusMethodNotAllowed)
+	}
+
+	exp, err := t.s.GetAll(r.Context())
+	if err != nil {
+		log.Error(err.Error())
+
+		switch {
+		case errors.Is(err, models.ErrNoExpressions):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		return
+	}
+
+	if len(exp) < 1 {
+		http.Error(w, models.ErrNoExpressions.Error(), http.StatusNotFound)
+		return
+	}
+
+	data, err := json.Marshal(map[string]any{
+		"expressions": exp,
+	})
+	if err != nil {
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, err = w.Write(data)
+	if err != nil {
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request) {
+	reqID := r.Context().Value("request_id")
+	log := t.log.With(zap.Any("request_id", reqID))
+
+	routes := strings.Split(r.URL.Path, "/")
+
+	id, err := strconv.ParseInt(routes[len(routes)-1], 10, 64)
+	if err != nil {
+		log.Error(err.Error())
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	exp, err := t.s.Get(r.Context(), int(id))
+	if err != nil {
+		log.Error(err.Error())
+
+		switch {
+		case errors.Is(err, models.ErrExpressionDoesNotExist):
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		return
+	}
+
+	data, err := json.Marshal(map[string]any{
+		"expression": exp,
+	})
+
+	_, err = w.Write(data)
+	if err != nil {
+		log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {

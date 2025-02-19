@@ -18,3 +18,7 @@ type Expression struct {
 	Status string  `json:"status"`
 	Result float64 `json:"result"`
 }
+
+type Calculation struct {
+	Expression string `json:"expression"`
+}
