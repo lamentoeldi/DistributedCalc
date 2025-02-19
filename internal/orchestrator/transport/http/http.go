@@ -12,6 +12,10 @@ import (
 	"strings"
 )
 
+const (
+	methodNotAllowed = "method not allowed"
+)
+
 type Service interface {
 	StartEvaluation(ctx context.Context, expression string) (int, error)
 	Get(ctx context.Context, id int) (*models.Expression, error)
@@ -54,12 +58,17 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig, queu
 	t.mux.Handle("/api/v1/expressions/", mwLogger(log, http.HandlerFunc(t.handleExpression)))
 
 	t.mux.HandleFunc("/internal/ping", t.handlePing)
-	t.mux.Handle("/internal/task", mwLogger(log, http.HandlerFunc(t.handleTask)))
+	t.mux.HandleFunc("/internal/task", t.handleTask)
 
 	return t
 }
 
-func (t *TransportHttp) handlePing(w http.ResponseWriter, _ *http.Request) {
+func (t *TransportHttp) handlePing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -68,7 +77,7 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 	log := t.log.With(zap.Any("request_id", reqID))
 
 	if r.Method != "POST" {
-		http.Error(w, r.Method, http.StatusMethodNotAllowed)
+		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 	}
 
 	var exp *models.Calculation
@@ -116,7 +125,7 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 	log := t.log.With(zap.Any("request_id", reqID))
 
 	if r.Method != "GET" {
-		http.Error(w, r.Method, http.StatusMethodNotAllowed)
+		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 	}
 
 	exp, err := t.s.GetAll(r.Context())
@@ -158,6 +167,11 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request) {
 	reqID := r.Context().Value("request_id")
 	log := t.log.With(zap.Any("request_id", reqID))
+
+	if r.Method != "GET" {
+		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+		return
+	}
 
 	routes := strings.Split(r.URL.Path, "/")
 
@@ -206,17 +220,14 @@ func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
-	reqID := r.Context().Value("request_id")
-	log := t.log.With(zap.Any("request_id", reqID))
-
 	task, err := t.q.Dequeue()
 	switch {
 	case errors.Is(err, models.ErrNoTasks):
-		log.Error(err.Error())
+		t.log.Debug(err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	case err != nil:
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -227,7 +238,7 @@ func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
 		Task: task,
 	})
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -235,22 +246,19 @@ func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(data)
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (t *TransportHttp) handlePostResult(w http.ResponseWriter, r *http.Request) {
-	reqID := r.Context().Value("request_id")
-	log := t.log.With(zap.Any("request_id", reqID))
-
 	defer r.Body.Close()
 
 	var result *models.TaskResult
 
 	err := json.NewDecoder(r.Body).Decode(&result)
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -258,11 +266,11 @@ func (t *TransportHttp) handlePostResult(w http.ResponseWriter, r *http.Request)
 	err = t.s.FinishTask(r.Context(), result)
 	switch {
 	case errors.Is(err, models.ErrTaskDoesNotExist):
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	case err != nil:
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

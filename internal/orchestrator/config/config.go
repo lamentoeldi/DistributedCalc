@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
 	"time"
 )
 
@@ -13,6 +14,8 @@ type Config struct {
 	SubtractionTime    time.Duration
 	MultiplicationTime time.Duration
 	DivisionTime       time.Duration
+
+	LogLevel zapcore.Level
 }
 
 func NewConfig() *Config {
@@ -25,6 +28,8 @@ func NewConfig() *Config {
 	subtractionTime := viper.GetInt("time_subtraction_ms")
 	multiplicationTime := viper.GetInt("time_multiplication_ms")
 	divisionTime := viper.GetInt("time_division_ms")
+
+	level := viper.GetString("log_level")
 
 	if host == "" {
 		host = "0.0.0.0"
@@ -50,6 +55,11 @@ func NewConfig() *Config {
 		divisionTime = 1
 	}
 
+	l, err := zapcore.ParseLevel(level)
+	if err != nil {
+		l = zapcore.InfoLevel
+	}
+
 	return &Config{
 		Host:               host,
 		Port:               port,
@@ -57,5 +67,6 @@ func NewConfig() *Config {
 		SubtractionTime:    time.Duration(subtractionTime) * time.Millisecond,
 		MultiplicationTime: time.Duration(multiplicationTime) * time.Millisecond,
 		DivisionTime:       time.Duration(divisionTime) * time.Millisecond,
+		LogLevel:           l,
 	}
 }

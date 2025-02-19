@@ -3,13 +3,27 @@ version: '3.8'
 services:
   orchestrator:
     build:
-      context:
-        ./cmd/orchestrator/
       dockerfile:
-        ../../build/package/orchestrator/Dockerfile
+        ./build/package/orchestrator/Dockerfile
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - TIME_ADDITION_MS=1
+      - TIME_SUBTRACTION_MS=1
+      - TIME_MULTIPLICATION_MS=1
+      - TIME_DIVISION_MS=1
+      - LOG_LEVEL=info
+    ports:
+      - '8080:8080'
   agent:
     build:
-      context:
-        ./cmd/agent/
       dockerfile:
-        ../../build/package/agent/Dockerfile
+        ./build/package/agent/Dockerfile
+    environment:
+      - LOG_LEVEL=info
+      - COMPUTING_POWER=10
+      - POLL_TIMEOUT=30
+      - MAX_RETRIES=3
+      - MASTER_URL=http://orchestrator:8080
+    depends_on:
+      - orchestrator

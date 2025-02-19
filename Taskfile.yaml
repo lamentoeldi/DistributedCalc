@@ -1,0 +1,9 @@
+version: '3'
+
+tasks:
+  run:
+    desc:
+      Runs Orchestrator and Agent instances with default configuration
+    cmds:
+      - go mod download
+      - go run cmd/orchestrator/main.go & go run cmd/agent/main.go

@@ -20,7 +20,10 @@ func main() {
 
 	cfg := config.NewConfig()
 
-	logger, err := zap.NewDevelopment()
+	logConfig := zap.NewProductionConfig()
+	logConfig.Level = zap.NewAtomicLevelAt(cfg.LogLevel)
+
+	logger, err := logConfig.Build()
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -60,6 +60,8 @@ paths:
                 properties:
                   expression:
                     $ref: '#/components/schemas/Expression'
+        400:
+          description: Invalid ID path parameter
         404:
           description: Expression not found
   /internal/task:
@@ -91,7 +93,7 @@ paths:
         400:
           description: Invalid request body
         404:
-          description: This task does not exist
+          description: Task with provided id does not exist
   /internal/ping:
     get:
       description: Ping master node to ensure it is running

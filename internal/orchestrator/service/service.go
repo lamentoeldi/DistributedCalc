@@ -99,6 +99,9 @@ func (s *Service) StartEvaluation(_ context.Context, expression string) (int, er
 		}
 
 		exp.Status = StatusCompleted
+
+		// Throw away excessive decimal places
+		res, _ = strconv.ParseFloat(fmt.Sprintf("%.8f", res), 64)
 		exp.Result = res
 		_ = s.r.Add(context.TODO(), exp)
 	}(exp)
