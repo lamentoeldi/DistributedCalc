@@ -1,7 +1,9 @@
 package service
 
 import (
+	"DistributedCalc/pkg/models"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"unicode"
 )
@@ -17,8 +19,6 @@ type node struct {
 	right *node
 	value token
 }
-
-type AST node
 
 type token struct {
 	tokenType string
@@ -193,38 +193,72 @@ func buildAST(tokens []token) (*node, error) {
 	return nil, fmt.Errorf("invalid expression")
 }
 
-// This implementation is used for tests only, needed to check that AST is built correctly
-func evaluateAST(node *node) (float64, error) {
+func evaluateAST(node *node, ch chan *models.Task, rch chan *models.TaskResult) (float64, error) {
 	if node.left == nil && node.right == nil {
 		return strconv.ParseFloat(node.value.value, 64)
 	}
 
-	var leftResult, rightResult float64
-	var leftErr, rightErr error
+	// All this goroutine bullshit may cause race, demands test
 
-	leftResult, leftErr = evaluateAST(node.left)
-	if leftErr != nil {
-		return 0, leftErr
-	}
+	chLeft := make(chan float64)
+	chRight := make(chan float64)
+	chErr := make(chan error)
 
-	rightResult, rightErr = evaluateAST(node.right)
-	if rightErr != nil {
-		return 0, rightErr
-	}
-
-	switch node.value.value {
-	case "+":
-		return leftResult + rightResult, nil
-	case "-":
-		return leftResult - rightResult, nil
-	case "*":
-		return leftResult * rightResult, nil
-	case "/":
-		if rightResult == 0 {
-			return 0, fmt.Errorf("division by zero")
+	go func() {
+		lRes, err := evaluateAST(node.left, ch, rch)
+		if err != nil {
+			chLeft <- 0
+			chErr <- err
+			return
 		}
-		return leftResult / rightResult, nil
+
+		chLeft <- lRes
+		chErr <- nil
+	}()
+
+	go func() {
+		rRes, err := evaluateAST(node.right, ch, rch)
+		if err != nil {
+			chRight <- 0
+			chErr <- err
+			return
+		}
+
+		chRight <- rRes
+		chErr <- nil
+	}()
+
+	leftResult := <-chLeft
+	rightResult := <-chRight
+
+	select {
+	case err := <-chErr:
+		if err != nil {
+			return 0, err
+		}
 	default:
-		return 0, fmt.Errorf("unknown operator %s", node.value.value)
 	}
+
+	// Pass this to channel, block until get result
+	t := &models.Task{
+		Id:            rand.Int(),
+		Arg1:          leftResult,
+		Arg2:          rightResult,
+		Operation:     node.value.value,
+		OperationTime: 0,
+	}
+
+	ch <- t
+	i := <-rch
+	return i.Result, nil
+}
+
+func walkAST(n *node) {
+	if n.left.left == nil && n.left.right == nil || n.right.left == nil && n.right.right == nil {
+		fmt.Println(n)
+		return
+	}
+
+	walkAST(n.left)
+	walkAST(n.right)
 }
