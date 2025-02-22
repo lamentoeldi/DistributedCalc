@@ -32,20 +32,18 @@ You can run calculation cluster in several ways
 ## Command Line
 Though it is advised to use Docker Compose to run app, you can still use console commands to run it
 
+Use the following commands to download dependencies and run app with default configuration
+
 ```shell
 go mod download
 ```
 
 ```shell
-go run cmd/orchestrator/main.go
-```
-
-```shell
-go run cmd/agent/main.go
+go run cmd/orchestrator/main.go & go run cmd/agent/main.go
 ```
 
 ## Taskfile
-Also you can use Taskfile to run app 
+Also you can use Taskfile to run app with default configuration
 
 ```shell
 task run
@@ -54,24 +52,14 @@ task run
 ## Docker CLI
 You can use Docker CLI to build images and then run containers
 
-Use this to build orchestrator image
+Use this to build images
 ```shell
-docker build -t orchestrator:latest -f ./build/package/orchestrator/Dockerfile ./
+docker build -t orchestrator:latest -f ./build/package/orchestrator/Dockerfile ./ & docker build -t agent:latest -f ./build/package/agent/Dockerfile ./
 ```
 
-Use this to build agent image
+Use this to run app with default configuration and forward orchestrator:8080 to localhost:8080
 ```shell
-docker build -t agent:latest -f ./build/package/agent/Dockerfile ./
-```
-
-Use this to run orchestrator
-```shell
-docker run -d --name orchestrator -p 8080:8080 orchestrator:latest
-```
-
-Use this to run agent
-```shell
-docker run -d --name agent --link orchestrator:orchestrator -e MASTER_URL=http://orchestrator:8080 agent:latest
+docker run -d --name orchestrator -p 8080:8080 orchestrator:latest && docker run -d --name agent --link orchestrator:orchestrator -e MASTER_URL=http://orchestrator:8080 agent:latest
 ```
 
 ## Docker Compose

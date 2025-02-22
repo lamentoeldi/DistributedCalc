@@ -19,6 +19,4 @@ WORKDIR /app
 
 COPY --from=build /app/agent /app/agent
 
-EXPOSE 8080
-
-ENTRYPOINT /app/agent
+ENTRYPOINT ["/app/agent"]

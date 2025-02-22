@@ -21,4 +21,4 @@ COPY --from=build /app/orchestrator /app/orchestrator
 
 EXPOSE 8080
 
-ENTRYPOINT /app/orchestrator
+ENTRYPOINT ["/app/orchestrator"]
