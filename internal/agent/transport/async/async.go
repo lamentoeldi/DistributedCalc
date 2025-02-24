@@ -28,14 +28,13 @@ type TransportAsync struct {
 	log      *zap.Logger
 	onceRun  sync.Once
 	onceStop sync.Once
-	wg       sync.WaitGroup
 }
 
-func NewTransportAsync(cfg *config.Config, log *zap.Logger, o Orchestrator, c Calculator, in chan *models.Task, out chan *models.TaskResult) *TransportAsync {
+func NewTransportAsync(cfg *config.Config, log *zap.Logger, o Orchestrator, c Calculator) *TransportAsync {
 	return &TransportAsync{
 		o:   o,
-		in:  in,
-		out: out,
+		in:  make(chan *models.Task, cfg.BufferSize),
+		out: make(chan *models.TaskResult, cfg.BufferSize),
 		c:   c,
 		log: log,
 		cfg: cfg,
@@ -44,10 +43,12 @@ func NewTransportAsync(cfg *config.Config, log *zap.Logger, o Orchestrator, c Ca
 
 // StartWorkers starts worker goroutines which take *models.Task from in, evaluate term and pass *models.TaskResult to out
 func (t *TransportAsync) StartWorkers(ctx context.Context) {
-	t.wg.Add(t.cfg.WorkersLimit)
+	wg := &sync.WaitGroup{}
+
+	wg.Add(t.cfg.WorkersLimit)
 	for range t.cfg.WorkersLimit {
 		go func() {
-			defer t.wg.Done()
+			defer wg.Done()
 
 			for {
 				select {
@@ -68,6 +69,11 @@ func (t *TransportAsync) StartWorkers(ctx context.Context) {
 			}
 		}()
 	}
+
+	go func() {
+		wg.Wait()
+		close(t.out)
+	}()
 }
 
 // produce takes *models.TaskResult from out channel and sends it back to the orchestrator
@@ -83,15 +89,13 @@ func (t *TransportAsync) produce() {
 
 // consume uses long polling to receive new tasks from server and send them to in channel
 func (t *TransportAsync) consume(ctx context.Context) {
-	t.wg.Add(1)
-
 	ticker := time.NewTicker(t.cfg.PollTimeout)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			t.wg.Done()
+			close(t.in)
 			return
 		case <-ticker.C:
 			task, err := t.o.GetTask(ctx)
@@ -114,14 +118,15 @@ func (t *TransportAsync) Run(ctx context.Context) {
 		t.StartWorkers(ctx)
 		go t.consume(ctx)
 		go t.produce()
+
+		t.log.Info("started polling orchestrator")
 	})
 }
 
 // Shutdown closes channels which causes all workers to stop
 func (t *TransportAsync) Shutdown() {
 	t.onceStop.Do(func() {
-		t.wg.Wait()
-		close(t.out)
-		close(t.in)
+		t.log.Info("shutting down...")
+		t.log.Sync()
 	})
 }

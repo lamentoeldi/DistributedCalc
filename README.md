@@ -95,17 +95,17 @@ Orchestrator can be configured via environment variables
 
 NOTICE: Do not change host if you run in docker, otherwise it may not work properly 
 
-`PORT`: Port to run on (default: `8080`)
+`PORT`: Port to run on (default: `8080`), must be in range between `1` and `65535`
 
 `LOG_LEVEL`: Level of logging (default: `info`)
 
-`TIME_ADDITION_MS`: Time in milliseconds which `+` operation takes (default: `1`)
+`TIME_ADDITION_MS`: Time in milliseconds which `+` operation takes (default: `1`), must be non-negative integer
 
-`TIME_SUBTRACTION_MS`: Time in milliseconds which `-` operation takes (default: `1`)
+`TIME_SUBTRACTION_MS`: Time in milliseconds which `-` operation takes (default: `1`), must be non-negative integer
 
-`TIME_MULTIPLICATION_MS`: Time in milliseconds which `*` operation takes (default: `1`)
+`TIME_MULTIPLICATION_MS`: Time in milliseconds which `*` operation takes (default: `1`), must be non-negative integer
 
-`TIME_DIVISION_MS`: Time in milliseconds which `/` operation takes (default: `1`)
+`TIME_DIVISION_MS`: Time in milliseconds which `/` operation takes (default: `1`), must be non-negative integer
 
 ## Agent
 Agent is a worker node of calculation cluster
@@ -119,11 +119,13 @@ Agent can be configured via environment variables
 
 `LOG_LEVEL`: Level of logging (default: `info`)
 
-`COMPUTING_POWER`: Amount of active workers per agent instance (default: `10`)
+`COMPUTING_POWER`: Amount of active workers per agent instance (default: `10`), must be positive integer
 
-`POLL_TIMEOUT`: Polling interval in milliseconds (default: `50`)
+`BUFFER_SIZE`: Size of task buffer (default: `128`), must be positive integer
 
-`MAX_RETRIES`: Maximum retries on failed requests (default: `3`)
+`POLL_TIMEOUT`: Polling interval in milliseconds (default: `50`), must be positive integer
+
+`MAX_RETRIES`: Maximum retries on failed requests (default: `3`), must be positive integer
 
 `MASTER_URL`: Orchestrator URL in `protocol://host:port` format (default: `http://localhost:8080`)
 
@@ -138,6 +140,7 @@ Agent can be configured via environment variables
 [nginx](https://nginx.org) or 
 [traefik](https://doc.traefik.io/traefik/) to balance incoming requests between running nodes
 - If result of expressions has more than `8` decimal places, they are thrown away
+- Notice that expressions like `2 2 + 3` will be processed as `22+3` due to system design
 
 ## Expression
 1. During the evaluation, field `result` in Expression schema is `0` until expression is evaluated
@@ -148,7 +151,7 @@ Agent can be configured via environment variables
 
 # Examples of Use
 - [API Specification](api/v1/api.yaml)
-- [More examples](examples/api/v1)
+- [More examples](examples)
 
 ## /api/v1/calculate
 Send expression to start evaluation
@@ -171,6 +174,32 @@ Content-Type: application/json
 }
 ```
 `id`: int 
+
+### Example
+
+#### Success
+
+```shell
+curl -X POST "http://localhost:8080/api/v1/calculate" \
+     -H "Content-Type: application/json" \
+     -d '{"expression": "2 + 2 * 2"}'
+```
+
+#### Bad Request
+
+```shell
+curl -X POST "http://localhost:8080/api/v1/calculate" \
+     -H "Content-Type: application/json" \
+     -d '"corrupted json"'
+```
+
+#### Unprocessable Entity
+
+```shell
+curl -X POST "http://localhost:8080/api/v1/calculate" \
+     -H "Content-Type: application/json" \
+     -d '{"expression": "2++3"}'
+```
 
 ## /api/v1/expressions
 Receive all expressions from orchestrator store
@@ -204,12 +233,18 @@ GET http://localhost:8080/api/v1/expressions
 
 `result`: double
 
+### Example
+
+```shell
+curl -X GET "http://localhost:8080/api/v1/expressions"
+```
+
 ## /api/v1/expressions/{id}
 Receive specific expression by id
 
 ### Request
 ```http request
-GET http://localhost:8080/api/v1/expressions/123
+GET http://localhost:8080/api/v1/expressions/1996284807462067036
 ```
 
 ### Response
@@ -227,6 +262,84 @@ GET http://localhost:8080/api/v1/expressions/123
 `status`: string
 
 `result`: double
+
+### Example
+
+#### Success or not found
+
+```shell
+curl -X GET "http://localhost:8080/api/v1/expressions/1996284807462067036"
+```
+
+#### Bad Request
+
+```shell
+curl -X GET "http://localhost:8080/api/v1/expressions/invalidpath"
+```
+
+## /internal/tasks
+
+### GET
+
+#### Request
+
+```http request
+GET http://localhost:8080/internal/task
+```
+
+#### Response
+
+```json
+{
+   "task": {
+      "id": 0,
+      "arg1": 3.5,
+      "arg2": 2,
+      "operation": "+",
+      "operation_time": 0.01
+   }
+}
+```
+
+#### Example
+
+##### Success or not found
+
+```shell
+curl -X GET "http://localhost:8080/internal/task"
+```
+
+### POST
+
+#### Request
+
+```http request
+POST http://localhost:8080/internal/task
+Content-Type: application/json
+
+{
+    "id": 90913132,
+    "result": 0.7
+}
+```
+
+#### Example
+
+##### Success or not found
+
+````shell
+curl -X POST "http://localhost:8080/internal/tasks" \
+     -H "Content-Type: application/json" \
+     -d '{"id": 999913183, "result": 0.7}'
+````
+
+##### Bad Request
+
+```shell
+curl -X POST "http://localhost:8080/internal/tasks" \
+     -H "Content-Type: application/json" \
+     -d '"corrupted json"'
+```
 
 # Future Plans
 

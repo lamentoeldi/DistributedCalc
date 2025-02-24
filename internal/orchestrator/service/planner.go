@@ -31,11 +31,11 @@ func (p *PromiseChan) WaitForResult(_ context.Context) (float64, error) {
 type PlannerChan struct {
 	channels map[int]chan *models.TaskResult
 	mu       sync.Mutex
-	q        *Queue[models.Task]
+	q        Queue[models.Task]
 	cfg      *config.Config
 }
 
-func NewPlannerChan(cfg *config.Config, queue *Queue[models.Task]) *PlannerChan {
+func NewPlannerChan(cfg *config.Config, queue Queue[models.Task]) *PlannerChan {
 	return &PlannerChan{
 		cfg:      cfg,
 		channels: make(map[int]chan *models.TaskResult),
@@ -43,7 +43,7 @@ func NewPlannerChan(cfg *config.Config, queue *Queue[models.Task]) *PlannerChan 
 	}
 }
 
-func (t *PlannerChan) PlanTask(_ context.Context, task *models.Task) (TaskPromise, error) {
+func (t *PlannerChan) PlanTask(ctx context.Context, task *models.Task) (TaskPromise, error) {
 	id := rand.Int()
 	ch := make(chan *models.TaskResult)
 
@@ -69,7 +69,11 @@ func (t *PlannerChan) PlanTask(_ context.Context, task *models.Task) (TaskPromis
 		return nil, errors.Join(models.ErrUnsupportedOperation, errors.New(task.Operation))
 	}
 
-	t.q.Enqueue(task)
+	err := t.q.Enqueue(ctx, task)
+	if err != nil {
+		return nil, err
+	}
+
 	return &PromiseChan{
 		ch: ch,
 	}, nil

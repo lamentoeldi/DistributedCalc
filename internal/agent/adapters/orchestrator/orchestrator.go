@@ -24,8 +24,8 @@ func NewOrchestrator(client *http.Client, url string, retries int) *Orchestrator
 	}
 }
 
-func (o *Orchestrator) GetTask(_ context.Context) (*models.Task, error) {
-	req, err := http.NewRequest("GET", o.Url+"/internal/task", nil)
+func (o *Orchestrator) GetTask(ctx context.Context) (*models.Task, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", o.Url+"/internal/task", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (o *Orchestrator) GetTask(_ context.Context) (*models.Task, error) {
 		case http.StatusNotFound:
 			return nil, models.ErrNoTasks
 		default:
-			return nil, fmt.Errorf("got status code %d", res.StatusCode)
+			return nil, fmt.Errorf("request failed with status code %d", res.StatusCode)
 		}
 	}
 
@@ -57,13 +57,13 @@ func (o *Orchestrator) GetTask(_ context.Context) (*models.Task, error) {
 	return task.Task, err
 }
 
-func (o *Orchestrator) PostResult(_ context.Context, result *models.TaskResult) error {
+func (o *Orchestrator) PostResult(ctx context.Context, result *models.TaskResult) error {
 	data, err := json.Marshal(result)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", o.Url+"/internal/task", bytes.NewBuffer(data))
+	req, err := http.NewRequestWithContext(ctx, "POST", o.Url+"/internal/task", bytes.NewBuffer(data))
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (o *Orchestrator) PostResult(_ context.Context, result *models.TaskResult) 
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("got status code %d", res.StatusCode)
+		return fmt.Errorf("request failed status code %d", res.StatusCode)
 	}
 
 	return nil

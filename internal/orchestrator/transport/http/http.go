@@ -1,6 +1,7 @@
 package http
 
 import (
+	"DistributedCalc/pkg/middleware"
 	"DistributedCalc/pkg/models"
 	"context"
 	"encoding/json"
@@ -21,11 +22,8 @@ type Service interface {
 	Get(ctx context.Context, id int) (*models.Expression, error)
 	GetAll(ctx context.Context) ([]*models.Expression, error)
 	FinishTask(ctx context.Context, result *models.TaskResult) error
-}
-
-type Queue[T any] interface {
-	Enqueue(obj *T)
-	Dequeue() (*T, error)
+	Enqueue(ctx context.Context, task *models.Task) error
+	Dequeue(ctx context.Context) (*models.Task, error)
 }
 
 type TransportHttpConfig struct {
@@ -35,7 +33,6 @@ type TransportHttpConfig struct {
 
 type TransportHttp struct {
 	s      Service
-	q      Queue[models.Task]
 	mux    *http.ServeMux
 	server *http.Server
 	log    *zap.Logger
@@ -43,19 +40,18 @@ type TransportHttp struct {
 	Port   int
 }
 
-func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig, queue Queue[models.Task]) *TransportHttp {
+func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *TransportHttp {
 	t := &TransportHttp{
 		s:    s,
-		q:    queue,
 		mux:  http.NewServeMux(),
 		log:  log,
 		Host: cfg.Host,
 		Port: cfg.Port,
 	}
 
-	t.mux.Handle("/api/v1/calculate", mwLogger(log, http.HandlerFunc(t.handleCalculate)))
-	t.mux.Handle("/api/v1/expressions", mwLogger(log, http.HandlerFunc(t.handleExpressions)))
-	t.mux.Handle("/api/v1/expressions/", mwLogger(log, http.HandlerFunc(t.handleExpression)))
+	t.mux.Handle("/api/v1/calculate", middleware.MwLogger(log, http.HandlerFunc(t.handleCalculate)))
+	t.mux.Handle("/api/v1/expressions", middleware.MwLogger(log, http.HandlerFunc(t.handleExpressions)))
+	t.mux.Handle("/api/v1/expressions/", middleware.MwLogger(log, http.HandlerFunc(t.handleExpression)))
 
 	t.mux.HandleFunc("/internal/ping", t.handlePing)
 	t.mux.HandleFunc("/internal/task", t.handleTask)
@@ -78,6 +74,7 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 
 	if r.Method != "POST" {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+		return
 	}
 
 	var exp *models.Calculation
@@ -220,7 +217,7 @@ func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
-	task, err := t.q.Dequeue()
+	task, err := t.s.Dequeue(r.Context())
 	switch {
 	case errors.Is(err, models.ErrNoTasks):
 		t.log.Debug(err.Error())
@@ -265,7 +262,7 @@ func (t *TransportHttp) handlePostResult(w http.ResponseWriter, r *http.Request)
 
 	err = t.s.FinishTask(r.Context(), result)
 	switch {
-	case errors.Is(err, models.ErrTaskDoesNotExist):
+	case errors.Is(err, models.ErrExpressionDoesNotExist):
 		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return

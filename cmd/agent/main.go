@@ -5,7 +5,6 @@ import (
 	"DistributedCalc/internal/agent/config"
 	"DistributedCalc/internal/agent/service"
 	"DistributedCalc/internal/agent/transport/async"
-	"DistributedCalc/pkg/models"
 	"context"
 	"go.uber.org/zap"
 	"log"
@@ -42,10 +41,7 @@ func main() {
 
 	app := service.NewService()
 
-	in := make(chan *models.Task, 64)
-	out := make(chan *models.TaskResult, 64)
-
-	transport := async.NewTransportAsync(cfg, logger, api, app, in, out)
+	transport := async.NewTransportAsync(cfg, logger, api, app)
 	transport.Run(ctx)
 
 	// Graceful stop

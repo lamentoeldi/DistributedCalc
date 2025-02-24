@@ -45,22 +45,6 @@ func NewConfig() (*Config, error) {
 		port = 8080
 	}
 
-	if additionTime == 0 {
-		additionTime = 1
-	}
-
-	if subtractionTime == 0 {
-		subtractionTime = 1
-	}
-
-	if multiplicationTime == 0 {
-		multiplicationTime = 1
-	}
-
-	if divisionTime == 0 {
-		divisionTime = 1
-	}
-
 	l, err := zapcore.ParseLevel(level)
 	if err != nil {
 		l = zapcore.InfoLevel

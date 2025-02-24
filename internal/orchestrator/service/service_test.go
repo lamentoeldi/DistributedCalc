@@ -1,6 +1,7 @@
 package service
 
 import (
+	"DistributedCalc/internal/orchestrator/adapters/queue"
 	"DistributedCalc/internal/orchestrator/config"
 	"DistributedCalc/internal/orchestrator/repository/memory"
 	"DistributedCalc/pkg/models"
@@ -12,7 +13,7 @@ import (
 )
 
 func TestService_tokenize(t *testing.T) {
-	s := NewService(nil, nil)
+	s := NewService(nil, nil, nil)
 
 	cases := []struct {
 		name    string
@@ -47,6 +48,11 @@ func TestService_tokenize(t *testing.T) {
 		{
 			name:    "expression with nested parenthesis",
 			exp:     "((2+3)*2)+1",
+			wantErr: false,
+		},
+		{
+			name:    "expressions with explicit signs",
+			exp:     "(+2-3)",
 			wantErr: false,
 		},
 		{
@@ -101,7 +107,7 @@ func TestService_tokenize(t *testing.T) {
 }
 
 func TestService_buildAST(t *testing.T) {
-	s := NewService(nil, nil)
+	s := NewService(nil, nil, nil)
 
 	cases := []struct {
 		name       string
@@ -173,9 +179,9 @@ func TestService_evaluateAST(t *testing.T) {
 	}
 
 	r := memory.NewRepositoryMemory()
-	q := NewQueue[models.Task](64)
+	q := queue.NewQueueChan[models.Task](64)
 	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p)
+	s := NewService(r, p, q)
 
 	cases := []struct {
 		name       string
@@ -225,14 +231,27 @@ func TestService_evaluateAST(t *testing.T) {
 			expected:   85,
 			wantErr:    false,
 		},
+		{
+			name:       "negative unary expression",
+			expression: "-2",
+			expected:   -2,
+			wantErr:    false,
+		},
+		{
+			name:       "positive unary expression",
+			expression: "2",
+			expected:   2,
+			wantErr:    false,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			// This is agent implementation for tests
 			go func() {
 				for {
-					task, err := q.Dequeue()
+					task, err := q.Dequeue(context.Background())
 					if err != nil {
 						continue
 					}
@@ -301,9 +320,9 @@ func TestService_StartEvaluation(t *testing.T) {
 	}
 
 	r := memory.NewRepositoryMemory()
-	q := NewQueue[models.Task](64)
+	q := queue.NewQueueChan[models.Task](64)
 	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p)
+	s := NewService(r, p, q)
 
 	cases := []struct {
 		name       string
@@ -349,9 +368,9 @@ func TestService_Get(t *testing.T) {
 	}
 
 	r := memory.NewRepositoryMemory()
-	q := NewQueue[models.Task](64)
+	q := queue.NewQueueChan[models.Task](64)
 	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p)
+	s := NewService(r, p, q)
 
 	cases := []struct {
 		name    string
@@ -405,9 +424,9 @@ func TestService_GetAll(t *testing.T) {
 	}
 
 	r := memory.NewRepositoryMemory()
-	q := NewQueue[models.Task](64)
+	q := queue.NewQueueChan[models.Task](64)
 	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p)
+	s := NewService(r, p, q)
 
 	exp := &models.Expression{
 		Id:     0,

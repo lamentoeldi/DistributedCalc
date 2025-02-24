@@ -2,7 +2,6 @@ package async
 
 import (
 	"DistributedCalc/internal/agent/config"
-	"DistributedCalc/pkg/models"
 	"DistributedCalc/test/mock"
 	"context"
 	"go.uber.org/zap"
@@ -21,10 +20,7 @@ func TestNewTransportAsync(t *testing.T) {
 	o := &mock.OrchestratorMock{Err: nil}
 	c := &mock.CalculatorMock{Err: nil}
 
-	in := make(chan *models.Task, 64)
-	out := make(chan *models.TaskResult, 64)
-
-	transport := NewTransportAsync(cfg, log, o, c, in, out)
+	transport := NewTransportAsync(cfg, log, o, c)
 	if transport == nil {
 		t.Error("Failed to create transport")
 	}
@@ -44,10 +40,7 @@ func TestTransportAsync_Run(t *testing.T) {
 	o := &mock.OrchestratorMock{Err: nil}
 	c := &mock.CalculatorMock{Err: nil}
 
-	in := make(chan *models.Task, 64)
-	out := make(chan *models.TaskResult, 64)
-
-	transport := NewTransportAsync(cfg, log, o, c, in, out)
+	transport := NewTransportAsync(cfg, log, o, c)
 	if transport == nil {
 		t.Fatal("Failed to create transport")
 	}
@@ -73,10 +66,7 @@ func TestTransportAsync_Shutdown(t *testing.T) {
 	o := &mock.OrchestratorMock{Err: nil}
 	c := &mock.CalculatorMock{Err: nil}
 
-	in := make(chan *models.Task, 64)
-	out := make(chan *models.TaskResult, 64)
-
-	transport := NewTransportAsync(cfg, log, o, c, in, out)
+	transport := NewTransportAsync(cfg, log, o, c)
 	if transport == nil {
 		t.Fatal("Failed to create transport")
 	}

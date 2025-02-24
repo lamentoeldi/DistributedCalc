@@ -1,0 +1,286 @@
+{
+	"info": {
+		"_postman_id": "6d51a1bc-4c07-410d-9f1d-e4c78314b7d0",
+		"name": "DistributedCalc API",
+		"description": "### Introduction\n\nThis is DistributedCalc API collection\n\n#### Notice:\n\n- 405 error is out of box but possible\n    \n- 5xx errors are out of box since they are non-reproducible",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "42563381"
+	},
+	"item": [
+		{
+			"name": "Client",
+			"item": [
+				{
+					"name": "Successful expressions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:8080/api/v1/expressions",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"v1",
+								"expressions"
+							]
+						},
+						"description": "Returns list of expressions stored with service"
+					},
+					"response": []
+				},
+				{
+					"name": "Bad request calculate",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "\"corrupted json\"",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:8080/api/v1/calculate",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"v1",
+								"calculate"
+							]
+						},
+						"description": "Receive 400 status"
+					},
+					"response": []
+				},
+				{
+					"name": "Unprocessable entity calculate",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"expression\": \"2++3\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:8080/api/v1/calculate",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"v1",
+								"calculate"
+							]
+						},
+						"description": "Causes 422 error"
+					},
+					"response": []
+				},
+				{
+					"name": "Correct expressions/{id}",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:8080/api/v1/expressions/{expressionID}",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"v1",
+								"expressions",
+								"{expressionID}"
+							]
+						},
+						"description": "Receives exact expression (notice the fact that you need to pass actual expression id in path)"
+					},
+					"response": []
+				},
+				{
+					"name": "Bad request expressions/{id}",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:8080/api/v1/expressions/invalidpath",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"v1",
+								"expressions",
+								"invalidpath"
+							]
+						},
+						"description": "Receive 400 status because id in path must be positive integer"
+					},
+					"response": []
+				},
+				{
+					"name": "Successful calculate",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"expression\": \"2 + 2 * 2\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:8080/api/v1/calculate",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"v1",
+								"calculate"
+							]
+						},
+						"description": "Initiates evaluation process for passed expression"
+					},
+					"response": []
+				}
+			],
+			"description": "These are the requests for client endpoints"
+		},
+		{
+			"name": "Internal",
+			"item": [
+				{
+					"name": "Request tasks",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:8080/internal/task",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"internal",
+								"task"
+							]
+						},
+						"description": "Receives one task from orchestrator or 404 if none are being processed"
+					},
+					"response": []
+				},
+				{
+					"name": "Result tasks",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"id\": 999913183,\n    \"result\": 0.7\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:8080/internal/tasks",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"internal",
+								"tasks"
+							]
+						},
+						"description": "Posts task result to orchestrator, returns 404 if task with provided id is not being processed"
+					},
+					"response": []
+				},
+				{
+					"name": "Bad request tasks",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "\"corrupted json\"",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:8080/internal/tasks",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"internal",
+								"tasks"
+							]
+						},
+						"description": "Example with corrupted body"
+					},
+					"response": []
+				}
+			],
+			"description": "These are the requests for internal endpoints"
+		}
+	]
+}
