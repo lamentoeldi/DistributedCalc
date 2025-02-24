@@ -1,0 +1,21 @@
+.Nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.Link {
+    min-width: 1.7em;
+    margin: 0.6em 0.7em 0.6em 0.7em;
+    color: rgba(255, 255, 255, 0.8);
+    transition: color 0.4s ease;
+}
+
+.Link:hover {
+    color: rgba(255, 255, 255, 1);
+}
+
+.Link:active {
+    color: #242735;
+}

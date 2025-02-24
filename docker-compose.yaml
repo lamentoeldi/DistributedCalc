@@ -4,7 +4,7 @@ services:
   orchestrator:
     build:
       dockerfile:
-        ./build/package/orchestrator/Dockerfile
+        backend/build/package/orchestrator/Dockerfile
     environment:
       - HOST=0.0.0.0
       - PORT=8080
@@ -18,7 +18,7 @@ services:
   agent:
     build:
       dockerfile:
-        ./build/package/agent/Dockerfile
+        backend/build/package/agent/Dockerfile
     environment:
       - LOG_LEVEL=info
       - COMPUTING_POWER=10

@@ -150,8 +150,8 @@ Agent can be configured via environment variables
    - `failed`: the system failed to process the expression
 
 # Examples of Use
-- [API Specification](api/v1/api.yaml)
-- [More examples](examples)
+- [API Specification](backend/api/v1/api.yaml)
+- [More examples](backend/examples)
 
 ## /api/v1/calculate
 Send expression to start evaluation
