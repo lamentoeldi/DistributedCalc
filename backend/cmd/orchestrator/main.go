@@ -1,6 +1,7 @@
 package main
 
 import (
+	"DistributedCalc/internal/orchestrator/adapters/queue"
 	"DistributedCalc/internal/orchestrator/config"
 	"DistributedCalc/internal/orchestrator/repository/memory"
 	"DistributedCalc/internal/orchestrator/service"
@@ -32,18 +33,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	queue := service.NewQueue[models.Task](64)
+	q := queue.NewQueueChan[models.Task](64)
 
 	rep := memory.NewRepositoryMemory()
-	planner := service.NewPlannerChan(cfg, queue)
-	app := service.NewService(rep, planner)
+	planner := service.NewPlannerChan(cfg, q)
+	app := service.NewService(rep, planner, q)
 
 	transportCfg := &http.TransportHttpConfig{
 		Host: cfg.Host,
 		Port: cfg.Port,
 	}
 
-	transport := http.NewTransportHttp(app, logger, transportCfg, queue)
+	transport := http.NewTransportHttp(app, logger, transportCfg)
 
 	transport.Run()
 
