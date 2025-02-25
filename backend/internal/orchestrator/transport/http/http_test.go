@@ -200,7 +200,7 @@ func TestTransportHttp_handleExpression(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s.Err = tc.err
 
-			req := httptest.NewRequest(tc.method, "/api/v1/expressions/1", nil)
+			req := httptest.NewRequest(tc.method, "/api/v1/expressions/d8241c51-8782-42fb-9cb7-61ca519064d9", nil)
 			r := httptest.NewRecorder()
 
 			th.handleExpression(r, req)

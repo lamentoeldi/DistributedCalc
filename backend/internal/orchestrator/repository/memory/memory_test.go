@@ -3,6 +3,7 @@ package memory
 import (
 	"DistributedCalc/pkg/models"
 	"context"
+	"github.com/google/uuid"
 	"log"
 	"testing"
 )
@@ -11,7 +12,7 @@ func TestRepositoryMemory_Add(t *testing.T) {
 	rep := NewRepositoryMemory()
 
 	exp := &models.Expression{
-		Id:     1,
+		Id:     uuid.NewString(),
 		Status: "testing",
 		Result: 64,
 	}
@@ -26,7 +27,7 @@ func TestRepositoryMemory_Get(t *testing.T) {
 	rep := NewRepositoryMemory()
 
 	exp := &models.Expression{
-		Id:     1,
+		Id:     uuid.NewString(),
 		Status: "testing",
 		Result: 64,
 	}
@@ -48,13 +49,13 @@ func TestRepositoryMemory_GetAll(t *testing.T) {
 	rep := NewRepositoryMemory()
 
 	exp1 := &models.Expression{
-		Id:     1,
+		Id:     uuid.NewString(),
 		Status: "testing",
 		Result: 64,
 	}
 
 	exp2 := &models.Expression{
-		Id:     2,
+		Id:     uuid.NewString(),
 		Status: "testing",
 		Result: 64,
 	}

@@ -7,6 +7,7 @@ import (
 	"DistributedCalc/pkg/models"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"log"
 	"testing"
 	"time"
@@ -372,25 +373,27 @@ func TestService_Get(t *testing.T) {
 	p := NewPlannerChan(cfg, q)
 	s := NewService(r, p, q)
 
+	found := uuid.NewString()
+
 	cases := []struct {
 		name    string
-		id      int
+		id      string
 		wantErr bool
 	}{
 		{
 			name:    "success",
-			id:      1,
+			id:      found,
 			wantErr: false,
 		},
 		{
 			name:    "expression not found",
-			id:      100,
+			id:      uuid.NewString(),
 			wantErr: true,
 		},
 	}
 
 	err := s.r.Add(context.Background(), &models.Expression{
-		Id:     1,
+		Id:     found,
 		Status: "testing",
 		Result: 0,
 	})
@@ -429,7 +432,7 @@ func TestService_GetAll(t *testing.T) {
 	s := NewService(r, p, q)
 
 	exp := &models.Expression{
-		Id:     0,
+		Id:     uuid.NewString(),
 		Status: "testing",
 		Result: 0,
 	}

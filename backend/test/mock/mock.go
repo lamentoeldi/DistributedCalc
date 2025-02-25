@@ -4,6 +4,7 @@ import (
 	"DistributedCalc/pkg/models"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"math/rand"
 )
 
@@ -53,11 +54,11 @@ type ServiceMock struct {
 	Err error
 }
 
-func (s *ServiceMock) StartEvaluation(_ context.Context, _ string) (int, error) {
-	return rand.Int(), s.Err
+func (s *ServiceMock) StartEvaluation(_ context.Context, _ string) (string, error) {
+	return uuid.NewString(), s.Err
 }
 
-func (s *ServiceMock) Get(_ context.Context, id int) (*models.Expression, error) {
+func (s *ServiceMock) Get(_ context.Context, id string) (*models.Expression, error) {
 	return &models.Expression{
 		Id:     id,
 		Status: "completed",
@@ -68,7 +69,7 @@ func (s *ServiceMock) Get(_ context.Context, id int) (*models.Expression, error)
 func (s *ServiceMock) GetAll(_ context.Context) ([]*models.Expression, error) {
 	return []*models.Expression{
 		{
-			Id:     rand.Int(),
+			Id:     uuid.NewString(),
 			Status: "completed",
 			Result: 0,
 		},
