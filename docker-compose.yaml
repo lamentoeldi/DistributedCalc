@@ -4,7 +4,9 @@ services:
   orchestrator:
     build:
       dockerfile:
-        backend/build/package/orchestrator/Dockerfile
+        build/package/orchestrator/Dockerfile
+      context:
+        backend
     environment:
       - HOST=0.0.0.0
       - PORT=8080
@@ -14,11 +16,13 @@ services:
       - TIME_DIVISION_MS=1
       - LOG_LEVEL=info
     ports:
-      - '8080:8080'
+      - '8080:8080' # Orchestrator remains open to external connections for test purposes
   agent:
     build:
       dockerfile:
-        backend/build/package/agent/Dockerfile
+        build/package/agent/Dockerfile
+      context:
+        backend
     environment:
       - LOG_LEVEL=info
       - COMPUTING_POWER=10
@@ -27,3 +31,13 @@ services:
       - MASTER_URL=http://orchestrator:8080
     depends_on:
       - orchestrator
+  frontend:
+    build:
+      dockerfile:
+        Dockerfile
+      context:
+        frontend
+      args:
+        BACKEND_URL: http://orchestrator:8080
+    ports:
+      - '3000:3000'

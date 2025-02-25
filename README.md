@@ -35,6 +35,7 @@ Though it is advised to use Docker Compose to run app, you can still use console
 Use the following commands to download dependencies and run app with default configuration
 
 ```shell
+cd backend
 go mod download
 ```
 
@@ -54,7 +55,7 @@ You can use Docker CLI to build images and then run containers
 
 Use this to build images
 ```shell
-docker build -t orchestrator:latest -f ./build/package/orchestrator/Dockerfile ./ & docker build -t agent:latest -f ./build/package/agent/Dockerfile ./
+docker build -t orchestrator:latest -f ./backend/build/package/orchestrator/Dockerfile ./backend & docker build -t agent:latest -f ./backend/build/package/agent/Dockerfile ./backend
 ```
 
 Use this to run app with default configuration and forward orchestrator:8080 to localhost:8080
