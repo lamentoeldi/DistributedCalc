@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -18,8 +18,8 @@ const (
 )
 
 type Service interface {
-	StartEvaluation(ctx context.Context, expression string) (int, error)
-	Get(ctx context.Context, id int) (*models.Expression, error)
+	StartEvaluation(ctx context.Context, expression string) (string, error)
+	Get(ctx context.Context, id string) (*models.Expression, error)
 	GetAll(ctx context.Context) ([]*models.Expression, error)
 	FinishTask(ctx context.Context, result *models.TaskResult) error
 	Enqueue(ctx context.Context, task *models.Task) error
@@ -172,16 +172,17 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 
 	routes := strings.Split(r.URL.Path, "/")
 
-	id, err := strconv.ParseInt(routes[len(routes)-1], 10, 64)
+	// To ensure uuid is valid
+	id, err := uuid.Parse(routes[len(routes)-1])
 	if err != nil {
 		log.Error(err.Error())
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
-	exp, err := t.s.Get(r.Context(), int(id))
+	exp, err := t.s.Get(r.Context(), id.String())
 	if err != nil {
-		log.Error(err.Error())
+		log.Error(err.Error(), zap.String("exp_id", id.String()))
 
 		switch {
 		case errors.Is(err, models.ErrExpressionDoesNotExist):

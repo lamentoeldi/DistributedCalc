@@ -17,7 +17,7 @@ The system consists of nodes of 2 types:
    - [Agent](#agent)
 3. [Good to Know](#good-to-know)
    - [General](#general)
-   - [Expression](#expression)
+   - [Expressions](#expression)
 4. [Examples of Use](#examples-of-use)
    - [/api/v1/calculate](#apiv1calculate)
    - [/api/v1/expressions](#apiv1expressions)
@@ -86,7 +86,7 @@ docker compose up
 ## Orchestrator
 Orchestrator is a master node of calculation cluster
 
-It decomposes the expression to run in parallel tasks on ***Agent*** instances
+It decomposes the expressionTable to run in parallel tasks on ***Agent*** instances
 
 ### Configuration
 Orchestrator can be configured via environment variables
@@ -142,19 +142,19 @@ Agent can be configured via environment variables
 - If result of expressions has more than `8` decimal places, they are thrown away
 - Notice that expressions like `2 2 + 3` will be processed as `22+3` due to system design
 
-## Expression
-1. During the evaluation, field `result` in Expression schema is `0` until expression is evaluated
+## Expressions
+1. During the evaluation, field `result` in Expressions schema is `0` until expressionTable is evaluated
 2. May have several statuses:
-   - `pending`: the expression is being processed
-   - `completed`: the expression is processed and result is ready for use
-   - `failed`: the system failed to process the expression
+   - `pending`: the expressionTable is being processed
+   - `completed`: the expressionTable is processed and result is ready for use
+   - `failed`: the system failed to process the expressionTable
 
 # Examples of Use
 - [API Specification](backend/api/v1/api.yaml)
 - [More examples](backend/examples)
 
 ## /api/v1/calculate
-Send expression to start evaluation
+Send expressionTable to start evaluation
 
 ### Request
 ```http request
@@ -162,10 +162,10 @@ POST localhost:8080/api/v1/calculate
 Content-Type: application/json
 
 {
-  "expression": "3*4+7"
+  "expressionTable": "3*4+7"
 }
 ```
-`expression`: string
+`expressionTable`: string
 
 ### Response
 ```json
@@ -182,7 +182,7 @@ Content-Type: application/json
 ```shell
 curl -X POST "http://localhost:8080/api/v1/calculate" \
      -H "Content-Type: application/json" \
-     -d '{"expression": "2 + 2 * 2"}'
+     -d '{"expressionTable": "2 + 2 * 2"}'
 ```
 
 #### Bad Request
@@ -198,7 +198,7 @@ curl -X POST "http://localhost:8080/api/v1/calculate" \
 ```shell
 curl -X POST "http://localhost:8080/api/v1/calculate" \
      -H "Content-Type: application/json" \
-     -d '{"expression": "2++3"}'
+     -d '{"expressionTable": "2++3"}'
 ```
 
 ## /api/v1/expressions
@@ -240,7 +240,7 @@ curl -X GET "http://localhost:8080/api/v1/expressions"
 ```
 
 ## /api/v1/expressions/{id}
-Receive specific expression by id
+Receive specific expressionTable by id
 
 ### Request
 ```http request
@@ -250,7 +250,7 @@ GET http://localhost:8080/api/v1/expressions/1996284807462067036
 ### Response
 ```json
 {
-   "expression": {
+   "expressionTable": {
       "id": 1996284807462067036, 
       "status": "completed", 
       "result": 19.0

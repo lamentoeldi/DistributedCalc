@@ -7,44 +7,47 @@ import (
 )
 
 type RepositoryMemory struct {
-	m sync.Map
+	m  map[string]*models.Expression
+	mu sync.Mutex
 }
 
 func NewRepositoryMemory() *RepositoryMemory {
-	return &RepositoryMemory{}
+	return &RepositoryMemory{
+		m: make(map[string]*models.Expression),
+	}
 }
 
 func (r *RepositoryMemory) Add(_ context.Context, exp *models.Expression) error {
-	r.m.Store(exp.Id, exp)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.m[exp.Id] = exp
 	return nil
 }
 
-func (r *RepositoryMemory) Get(_ context.Context, id int) (*models.Expression, error) {
-	val, ok := r.m.Load(id)
+func (r *RepositoryMemory) Get(_ context.Context, id string) (*models.Expression, error) {
+	r.mu.Lock()
+	val, ok := r.m[id]
+	r.mu.Unlock()
 	if !ok {
 		return nil, models.ErrExpressionDoesNotExist
 	}
 
-	if exp, ok := val.(*models.Expression); ok {
-		return exp, nil
-	}
-
-	return nil, models.ErrExpressionDoesNotExist
+	return val, nil
 }
 
 func (r *RepositoryMemory) GetAll(_ context.Context) ([]*models.Expression, error) {
 	expressions := make([]*models.Expression, 0)
-	var err error
 
-	r.m.Range(func(_, value any) bool {
-		if exp, ok := value.(*models.Expression); ok {
-			expressions = append(expressions, exp)
-			return true
-		}
+	r.mu.Lock()
+	for _, val := range r.m {
+		expressions = append(expressions, val)
+	}
+	r.mu.Unlock()
 
-		err = models.ErrNoExpressions
-		return false
-	})
+	if len(expressions) < 1 {
+		return nil, models.ErrNoExpressions
+	}
 
-	return expressions, err
+	return expressions, nil
 }

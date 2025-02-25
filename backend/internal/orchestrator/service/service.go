@@ -4,7 +4,7 @@ import (
 	"DistributedCalc/pkg/models"
 	"context"
 	"fmt"
-	"math/rand"
+	"github.com/google/uuid"
 	"strconv"
 	"unicode"
 )
@@ -26,7 +26,7 @@ type TaskPromise interface {
 
 type Repository interface {
 	Add(ctx context.Context, exp *models.Expression) error
-	Get(ctx context.Context, id int) (*models.Expression, error)
+	Get(ctx context.Context, id string) (*models.Expression, error)
 	GetAll(ctx context.Context) ([]*models.Expression, error)
 }
 
@@ -49,19 +49,19 @@ func NewService(r Repository, p TaskPlanner, q Queue[models.Task]) *Service {
 	}
 }
 
-func (s *Service) StartEvaluation(ctx context.Context, expression string) (int, error) {
+func (s *Service) StartEvaluation(ctx context.Context, expression string) (string, error) {
 	// In blocking part, initial validation is performed
 	tokens, err := s.tokenize(expression)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	ast, err := s.buildAST(tokens)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
-	id := rand.Int()
+	id := uuid.NewString()
 
 	exp := &models.Expression{
 		Id:     id,
@@ -71,7 +71,7 @@ func (s *Service) StartEvaluation(ctx context.Context, expression string) (int, 
 
 	err = s.r.Add(context.TODO(), exp)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	// In non-blocking part, further calculation is initiated
@@ -95,7 +95,7 @@ func (s *Service) StartEvaluation(ctx context.Context, expression string) (int, 
 	return id, nil
 }
 
-func (s *Service) Get(ctx context.Context, id int) (*models.Expression, error) {
+func (s *Service) Get(ctx context.Context, id string) (*models.Expression, error) {
 	return s.r.Get(ctx, id)
 }
 

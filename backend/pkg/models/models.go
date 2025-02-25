@@ -14,7 +14,7 @@ type TaskResult struct {
 }
 
 type Expression struct {
-	Id     int     `json:"id"`
+	Id     string  `json:"id"`
 	Status string  `json:"status"`
 	Result float64 `json:"result"`
 }
