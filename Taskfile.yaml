@@ -1,9 +1,17 @@
 version: '3'
 
 tasks:
-  run:
+  run-backend:
     desc:
       Runs Orchestrator and Agent instances with default configuration
+    dir: backend
     cmds:
       - go mod download
       - go run cmd/orchestrator/main.go & go run cmd/agent/main.go
+  run-frontend:
+    desc: Runs frontend instance with default configuration
+    dir: frontend
+    cmds:
+      - export BACKEND_URL=http://localhost:8080
+      - npm install
+      - npm run build && npm run start

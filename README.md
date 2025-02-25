@@ -43,29 +43,58 @@ go mod download
 go run cmd/orchestrator/main.go & go run cmd/agent/main.go
 ```
 
+Use this to run frontend with default configuration
+
+```shell
+cd frontend
+npm run build && npm run start
+```
+
 ## Taskfile
 Also you can use Taskfile to run app with default configuration
 
+Use this to run backend with default configuration
+
 ```shell
-task run
+task run-backend
+```
+
+Use this to run frontend with default configuration
+
+```shell
+task run-frontend
 ```
 
 ## Docker CLI
 You can use Docker CLI to build images and then run containers
 
 Use this to build images
+
 ```shell
 docker build -t orchestrator:latest -f ./backend/build/package/orchestrator/Dockerfile ./backend & docker build -t agent:latest -f ./backend/build/package/agent/Dockerfile ./backend
 ```
 
 Use this to run app with default configuration and forward orchestrator:8080 to localhost:8080
+
 ```shell
 docker run -d --name orchestrator -p 8080:8080 orchestrator:latest && docker run -d --name agent --link orchestrator:orchestrator -e MASTER_URL=http://orchestrator:8080 agent:latest
 ```
 
+Use this to build frontend image with default backend URL
+
+```shell
+docker build -t frontend:latest --build-arg BACKEND_URL=http://orchestrator:8080 ./frontend
+```
+
+Use this to run frontend with default configuration (run orchestrator first)
+
+```shell
+docker run -d --name frontend -p 3000:3000 --link orchestrator:orchestrator frontend:latest
+```
+
 ## Docker Compose
 Docker Compose is the most preferable way to run app. As mentioned in [compose file](docker-compose.yaml), on default 
-the port 8080 of ***Orchestrator*** is bound on 8080 port of local machine
+the port 8080 of ***Orchestrator*** is bound on 8080 port of local machine and the port 3000 of ***Frontend*** is bound on 3000 port of local machine
 
 Use this to build and run app
 ```shell
@@ -129,6 +158,11 @@ Agent can be configured via environment variables
 `MAX_RETRIES`: Maximum retries on failed requests (default: `3`), must be positive integer
 
 `MASTER_URL`: Orchestrator URL in `protocol://host:port` format (default: `http://localhost:8080`)
+
+## Frontend
+Frontend is a web-interface for DistributedCalc
+
+NOTICE: Due to Next.js specifics, `BACKEND_URL` build arg in `protocol://host:port` format must be provided
 
 # Good to Know
 
