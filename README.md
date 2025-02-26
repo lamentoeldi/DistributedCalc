@@ -6,18 +6,23 @@ The system consists of nodes of 2 types:
 - Orchestrator
 - Agent
 
+Also, the web-interface is provided
+
 # Table of Contents
-1. [Start Up](#start-up)
-   - [Command Line](#command-line)
-   - [Taskfile](#taskfile)
-   - [Docker Compose](#docker-compose)
-   - [Docker CLI](#docker-cli)
+1. [Getting Started](#getting-started)
+   - [Requirements](#requirements)
+   - [Start Up](#start-up)
+     - [Command Line](#command-line)
+     - [Taskfile](#taskfile)
+     - [Docker Compose](#docker-compose)
+     - [Docker CLI](#docker-cli)
 2. [Services](#services)
    - [Orchestrator](#orchestrator)
    - [Agent](#agent)
+   - [Frontend](#frontend)
 3. [Good to Know](#good-to-know)
    - [General](#general)
-   - [Expressions](#expression)
+   - [Expressions](#expressions)
 4. [Examples of Use](#examples-of-use)
    - [/api/v1/calculate](#apiv1calculate)
    - [/api/v1/expressions](#apiv1expressions)
@@ -26,10 +31,24 @@ The system consists of nodes of 2 types:
   
 
 
-# Start Up
+# Getting Started
+
+## Requirements
+Before you start, you should have the following dependencies installed:
+
+Mandatory
+- Go 1.23.0 and above
+- NodeJS 21.0.0 and above<br/>
+*Or*
+- Docker 28.0.0 and above
+
+Optional
+- Taskfile 3.41.0 and above
+
+## Start Up
 You can run calculation cluster in several ways
 
-## Command Line
+### Command Line
 Though it is advised to use Docker Compose to run app, you can still use console commands to run it
 
 Use the following commands to download dependencies and run app with default configuration
@@ -37,9 +56,6 @@ Use the following commands to download dependencies and run app with default con
 ```shell
 cd backend
 go mod download
-```
-
-```shell
 go run cmd/orchestrator/main.go & go run cmd/agent/main.go
 ```
 
@@ -47,10 +63,12 @@ Use this to run frontend with default configuration
 
 ```shell
 cd frontend
+export BACKEND_URL=http://localhost:8080
+npm install
 npm run build && npm run start
 ```
 
-## Taskfile
+### Taskfile
 Also you can use Taskfile to run app with default configuration
 
 Use this to run backend with default configuration
@@ -65,7 +83,7 @@ Use this to run frontend with default configuration
 task run-frontend
 ```
 
-## Docker CLI
+### Docker CLI
 You can use Docker CLI to build images and then run containers
 
 Use this to build images
@@ -92,7 +110,7 @@ Use this to run frontend with default configuration (run orchestrator first)
 docker run -d --name frontend -p 3000:3000 --link orchestrator:orchestrator frontend:latest
 ```
 
-## Docker Compose
+### Docker Compose
 Docker Compose is the most preferable way to run app. As mentioned in [compose file](docker-compose.yaml), on default 
 the port 8080 of ***Orchestrator*** is bound on 8080 port of local machine and the port 3000 of ***Frontend*** is bound on 3000 port of local machine
 
@@ -162,7 +180,12 @@ Agent can be configured via environment variables
 ## Frontend
 Frontend is a web-interface for DistributedCalc
 
-NOTICE: Due to Next.js specifics, `BACKEND_URL` build arg in `protocol://host:port` format must be provided
+### Configuration
+Frontend can be configured via environment variables or build arguments
+
+`BACKEND_URL`: Backend API URL in `protocol://host:port` format
+
+NOTICE: Due to Next.js specifics, `BACKEND_URL` must be a build argument, not an environment variable if you run in Docker
 
 # Good to Know
 
@@ -381,3 +404,4 @@ curl -X POST "http://localhost:8080/internal/tasks" \
 - Implement durable task queue using message broker (RabbitMQ, NATS, Redis, etc.)
 - Implement persistent data storage using database (PostgreSQL, SQLite, MySQL, etc.)
 - Implement pagination
+- Add proxy to increase scalability
