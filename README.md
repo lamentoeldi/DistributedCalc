@@ -6,7 +6,7 @@ The system consists of nodes of 2 types:
 - Orchestrator
 - Agent
 
-Also, the web-interface is provided
+Also, the web interface is provided
 
 # Table of Contents
 1. [Getting Started](#getting-started)
@@ -17,6 +17,7 @@ Also, the web-interface is provided
      - [Docker CLI](#docker-cli)
      - [Docker Compose](#docker-compose)
 2. [Services](#services)
+   - [Scheme](#scheme)
    - [Orchestrator](#orchestrator)
    - [Agent](#agent)
    - [Frontend](#frontend)
@@ -34,24 +35,31 @@ Also, the web-interface is provided
 # Getting Started
 
 ## Requirements
-Before you start, you should have the following dependencies installed:
+Before you start, you may want to have the following dependencies installed:
 
-Mandatory
+### Mandatory
 - Go 1.23.0 and above
 - NodeJS 21.0.0 and above<br/>
-*Or*
+***Or***
 - Docker 28.0.0 and above
 
-Optional
+### Optional
 - Taskfile 3.41.0 and above
 
 ## Start Up
-You can run calculation cluster in several ways
+You can run application in several ways:
+
+- [Command Line](#command-line)
+- [Taskfile](#taskfile)
+- [Docker CLI](#docker-cli)
+- [Docker Compose](#docker-compose)
+
+Docker Compose is advised for your convenience
 
 ### Command Line
-Though it is advised to use Docker Compose to run app, you can still use console commands to run it
+Though it is advised to use Docker Compose to run application, you can still use console commands to run it
 
-Use the following commands to download dependencies and run app with default configuration
+**Download dependencies and run application**
 
 ```shell
 cd backend
@@ -59,7 +67,7 @@ go mod download
 go run cmd/orchestrator/main.go & go run cmd/agent/main.go
 ```
 
-Use this to run frontend with default configuration
+**Download dependencies and run web interface**
 
 ```shell
 cd frontend
@@ -68,43 +76,49 @@ npm install
 npm run build && npm run start
 ```
 
-### Taskfile
-Also you can use Taskfile to run app with default configuration
+> **NOTICE**: `export` command only works for Linux and macOS, use `$env` for Windows instead
 
-Use this to run backend with default configuration
+### Taskfile
+Also, you can use Taskfile to run application with default configuration
+
+**Run backend**
 
 ```shell
 task run-backend
 ```
 
-Use this to run frontend with default configuration
+**Run web interface**
 
 ```shell
 task run-frontend
 ```
 
+> **NOTICE**: Taskfile initiates `export` command which is only available for Linux and macOS. No workaround for now
+
 ### Docker CLI
 You can use Docker CLI to build images and then run containers
 
-Use this to build images
+**Build orchestrator and agent**
 
 ```shell
 docker build -t orchestrator:latest -f ./backend/build/package/orchestrator/Dockerfile ./backend & docker build -t agent:latest -f ./backend/build/package/agent/Dockerfile ./backend
 ```
 
-Use this to run app with default configuration and forward orchestrator:8080 to localhost:8080
+**Run orchestrator and agent**
 
 ```shell
 docker run -d --name orchestrator -p 8080:8080 orchestrator:latest && docker run -d --name agent --link orchestrator:orchestrator -e MASTER_URL=http://orchestrator:8080 agent:latest
 ```
 
-Use this to build frontend image with default backend URL
+> **NOTICE**: By default, orchestrator port `8080` is forwarded on host port `8080`
+
+**Build web interface**
 
 ```shell
 docker build -t frontend:latest --build-arg BACKEND_URL=http://orchestrator:8080 ./frontend
 ```
 
-Use this to run frontend with default configuration (run orchestrator first)
+**Run web interface**
 
 ```shell
 docker run -d --name frontend -p 3000:3000 --link orchestrator:orchestrator frontend:latest
@@ -114,35 +128,49 @@ docker run -d --name frontend -p 3000:3000 --link orchestrator:orchestrator fron
 Docker Compose is the most preferable way to run app. As mentioned in [compose file](docker-compose.yaml), on default 
 the port 8080 of ***Orchestrator*** is bound on 8080 port of local machine and the port 3000 of ***Frontend*** is bound on 3000 port of local machine
 
-Use this to build and run app
+**Build and run all services**
+
 ```shell
 docker compose up --build
 ```
 
-Use this to build images
+**Build all images**
+
 ```shell
 docker compose build
 ```
 
-Use this to run app
+**Run all services**
+
 ```shell
 docker compose up
 ```
 
 # Services
-<iframe width="768" height="432" src="https://miro.com/app/live-embed/uXjVIVAICe8=/?moveToViewport=673,313,783,588&embedId=136802335814" frameborder="0" scrolling="no" allow="fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe>
+
+## Scheme
+This scheme illustrates the way expressions are processed
+
+<img src="backend/docs/assets/images/DistributedCalc.jpg" alt="system schema" width="50%" height="50%">
+
+**Queue**: Task queue. Currently, implemented as built-in orchestrator, later may be replaced with message bus
+
+**Store**: Expression store. Currently, implemented as thread-safe map, later may be replaced with proper database
+
+**Planner**: Task planner. Inner controller, responsible for task routing: it ensures that each result received from agent will be associated with the corresponding task
 
 ## Orchestrator
-Orchestrator is a master node of calculation cluster
+Orchestrator is the master node of distributed calculator
 
-It decomposes the expressionTable to run in parallel tasks on ***Agent*** instances
+- It provides REST API for client requests
+- It decomposes expressions into atomic tasks and enqueues them for agent to process
 
 ### Configuration
 Orchestrator can be configured via environment variables
 
 `HOST`: Host to run on (default: `0.0.0.0`)
 
-NOTICE: Do not change host if you run in docker, otherwise it may not work properly 
+> **NOTICE**: Do not change host if you run in docker, otherwise it may not work properly 
 
 `PORT`: Port to run on (default: `8080`), must be in range between `1` and `65535`
 
@@ -157,11 +185,12 @@ NOTICE: Do not change host if you run in docker, otherwise it may not work prope
 `TIME_DIVISION_MS`: Time in milliseconds which `/` operation takes (default: `1`), must be non-negative integer
 
 ## Agent
-Agent is a worker node of calculation cluster
+Agent is a slave node of distributed calculator
 
-It uses long polling to receive tasks via ***Orchestrator*** API
+- It pulls tasks from orchestrator to process and sends the result back after processing
+- It supports horizontal scaling via ***reverse proxy***
 
-NOTICE: On start up, agent will try to connect to orchestrator. It will exit immediately on failure after retries
+> **NOTICE**: On start up, agent will try to connect to orchestrator. It will exit immediately on failure after retries
 
 ### Configuration
 Agent can be configured via environment variables
@@ -179,14 +208,14 @@ Agent can be configured via environment variables
 `MASTER_URL`: Orchestrator URL in `protocol://host:port` format (default: `http://localhost:8080`)
 
 ## Frontend
-Frontend is a web-interface for DistributedCalc
+Frontend is a web interface for distributed calculator
 
 ### Configuration
-Frontend can be configured via environment variables or build arguments
+Frontend can be configured via environment variables
 
 `BACKEND_URL`: Backend API URL in `protocol://host:port` format
 
-NOTICE: Due to Next.js specifics, `BACKEND_URL` must be a build argument, not an environment variable if you run in Docker
+> **NOTICE**: Due to Next.js specifics, `BACKEND_URL` must be a build argument if you run in Docker
 
 # Good to Know
 
@@ -194,15 +223,14 @@ NOTICE: Due to Next.js specifics, `BACKEND_URL` must be a build argument, not an
 
 - Currently, the system keeps all data in-memory, that means that all data will be lost on restart
 - Currently, the system is stateful, that means that data you receive depends on which node you have accessed
-- Agents use long polling to receive tasks from orchestrator
 - It is possible to use proxy like [envoy](https://www.envoyproxy.io), 
 [nginx](https://nginx.org) or 
 [traefik](https://doc.traefik.io/traefik/) to balance incoming requests between running nodes
 - If result of expressions has more than `8` decimal places, they are thrown away
-- Notice that expressions like `2 2 + 3` will be processed as `22+3` due to system design
+- Notice that expressions like `2 2 + 3` will be processed as `22+3` due to the system design
 
 ## Expressions
-1. During the evaluation, field `result` in Expressions schema is `0` until expressionTable is evaluated
+1. During the evaluation, field `result` in Expressions schema is `0` until expression is evaluated
 2. May have several statuses:
    - `pending`: the expression is being processed
    - `completed`: the expression is processed and result is ready for use
@@ -213,7 +241,7 @@ NOTICE: Due to Next.js specifics, `BACKEND_URL` must be a build argument, not an
 - [More examples](backend/examples)
 
 ## /api/v1/calculate
-Send expressionTable to start evaluation
+Send expression to start evaluation
 
 ### Request
 ```http request
@@ -221,10 +249,10 @@ POST localhost:8080/api/v1/calculate
 Content-Type: application/json
 
 {
-  "expressionTable": "3*4+7"
+  "expression": "3*4+7"
 }
 ```
-`expressionTable`: string
+`expression`: string
 
 ### Response
 ```json
@@ -241,7 +269,7 @@ Content-Type: application/json
 ```shell
 curl -X POST "http://localhost:8080/api/v1/calculate" \
      -H "Content-Type: application/json" \
-     -d '{"expressionTable": "2 + 2 * 2"}'
+     -d '{"expression": "2 + 2 * 2"}'
 ```
 
 #### Bad Request
@@ -257,7 +285,7 @@ curl -X POST "http://localhost:8080/api/v1/calculate" \
 ```shell
 curl -X POST "http://localhost:8080/api/v1/calculate" \
      -H "Content-Type: application/json" \
-     -d '{"expressionTable": "2++3"}'
+     -d '{"expression": "2++3"}'
 ```
 
 ## /api/v1/expressions
@@ -299,7 +327,7 @@ curl -X GET "http://localhost:8080/api/v1/expressions"
 ```
 
 ## /api/v1/expressions/{id}
-Receive specific expressionTable by id
+Receive specific expression by id
 
 ### Request
 ```http request
@@ -309,7 +337,7 @@ GET http://localhost:8080/api/v1/expressions/1996284807462067036
 ### Response
 ```json
 {
-   "expressionTable": {
+   "expression": {
       "id": 1996284807462067036, 
       "status": "completed", 
       "result": 19.0

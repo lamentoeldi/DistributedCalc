@@ -1,4 +1,4 @@
-module DistributedCalc
+module github.com/distributed-calc/v1
 
 go 1.23
 

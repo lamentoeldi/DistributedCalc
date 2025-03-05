@@ -1,10 +1,10 @@
 package service
 
 import (
-	"DistributedCalc/internal/orchestrator/config"
-	"DistributedCalc/pkg/models"
 	"context"
 	"errors"
+	"github.com/distributed-calc/v1/internal/orchestrator/config"
+	"github.com/distributed-calc/v1/pkg/models"
 	"math"
 	"math/rand"
 	"sync"

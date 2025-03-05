@@ -1,9 +1,9 @@
 package service
 
 import (
-	"DistributedCalc/pkg/models"
 	"context"
 	"fmt"
+	"github.com/distributed-calc/v1/pkg/models"
 	"github.com/google/uuid"
 	"strconv"
 	"unicode"

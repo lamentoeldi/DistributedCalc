@@ -1,9 +1,9 @@
 package orchestrator
 
 import (
-	"DistributedCalc/pkg/models"
 	"context"
 	"encoding/json"
+	"github.com/distributed-calc/v1/pkg/models"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"

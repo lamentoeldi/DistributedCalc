@@ -1,8 +1,8 @@
 package memory
 
 import (
-	"DistributedCalc/pkg/models"
 	"context"
+	"github.com/distributed-calc/v1/pkg/models"
 	"github.com/google/uuid"
 	"log"
 	"testing"

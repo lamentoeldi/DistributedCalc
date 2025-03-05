@@ -1,12 +1,12 @@
 package service
 
 import (
-	"DistributedCalc/internal/orchestrator/adapters/queue"
-	"DistributedCalc/internal/orchestrator/config"
-	"DistributedCalc/internal/orchestrator/repository/memory"
-	"DistributedCalc/pkg/models"
 	"context"
 	"fmt"
+	"github.com/distributed-calc/v1/internal/orchestrator/adapters/queue"
+	"github.com/distributed-calc/v1/internal/orchestrator/config"
+	"github.com/distributed-calc/v1/internal/orchestrator/repository/memory"
+	"github.com/distributed-calc/v1/pkg/models"
 	"github.com/google/uuid"
 	"log"
 	"testing"

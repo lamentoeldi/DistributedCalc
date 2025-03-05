@@ -1,10 +1,10 @@
 package async
 
 import (
-	"DistributedCalc/internal/agent/config"
-	"DistributedCalc/pkg/models"
 	"context"
 	"errors"
+	"github.com/distributed-calc/v1/internal/agent/config"
+	"github.com/distributed-calc/v1/pkg/models"
 	"go.uber.org/zap"
 	"sync"
 	"time"
