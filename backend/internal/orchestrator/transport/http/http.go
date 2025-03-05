@@ -1,12 +1,12 @@
 package http
 
 import (
-	"DistributedCalc/pkg/middleware"
-	"DistributedCalc/pkg/models"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/distributed-calc/v1/pkg/middleware"
+	"github.com/distributed-calc/v1/pkg/models"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
@@ -49,12 +49,12 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *Tra
 		Port: cfg.Port,
 	}
 
-	t.mux.Handle("/api/v1/calculate", middleware.MwLogger(log, http.HandlerFunc(t.handleCalculate)))
-	t.mux.Handle("/api/v1/expressions", middleware.MwLogger(log, http.HandlerFunc(t.handleExpressions)))
-	t.mux.Handle("/api/v1/expressions/", middleware.MwLogger(log, http.HandlerFunc(t.handleExpression)))
+	t.mux.Handle("/api/v1/calculate", middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleCalculate))))
+	t.mux.Handle("/api/v1/expressions", middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleExpressions))))
+	t.mux.Handle("/api/v1/expressions/", middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleExpression))))
 
-	t.mux.HandleFunc("/internal/ping", t.handlePing)
-	t.mux.HandleFunc("/internal/task", t.handleTask)
+	t.mux.Handle("/internal/ping", middleware.MwRecover(log, http.HandlerFunc(t.handlePing)))
+	t.mux.Handle("/internal/task", middleware.MwRecover(log, http.HandlerFunc(t.handleTask)))
 
 	return t
 }

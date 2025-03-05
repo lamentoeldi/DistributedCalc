@@ -1,11 +1,11 @@
 package service
 
 import (
-	"DistributedCalc/internal/orchestrator/adapters/queue"
-	"DistributedCalc/internal/orchestrator/config"
-	"DistributedCalc/pkg/models"
 	"context"
 	"errors"
+	"github.com/distributed-calc/v1/internal/orchestrator/adapters/queue"
+	"github.com/distributed-calc/v1/internal/orchestrator/config"
+	"github.com/distributed-calc/v1/pkg/models"
 	"testing"
 	"time"
 )

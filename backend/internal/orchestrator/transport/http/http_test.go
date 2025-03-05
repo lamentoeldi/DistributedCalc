@@ -1,11 +1,11 @@
 package http
 
 import (
-	"DistributedCalc/pkg/models"
-	"DistributedCalc/test/mock"
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/distributed-calc/v1/pkg/models"
+	"github.com/distributed-calc/v1/test/mock"
 	"go.uber.org/zap"
 	"net/http"
 	"net/http/httptest"

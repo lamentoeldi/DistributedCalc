@@ -1,9 +1,9 @@
 package async
 
 import (
-	"DistributedCalc/internal/agent/config"
-	"DistributedCalc/test/mock"
 	"context"
+	"github.com/distributed-calc/v1/internal/agent/config"
+	"github.com/distributed-calc/v1/test/mock"
 	"go.uber.org/zap"
 	"testing"
 	"time"

@@ -1,8 +1,8 @@
 package service
 
 import (
-	"DistributedCalc/pkg/models"
 	"fmt"
+	"github.com/distributed-calc/v1/pkg/models"
 	"time"
 )
 

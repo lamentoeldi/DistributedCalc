@@ -1,13 +1,13 @@
 package main
 
 import (
-	"DistributedCalc/internal/orchestrator/adapters/queue"
-	"DistributedCalc/internal/orchestrator/config"
-	"DistributedCalc/internal/orchestrator/repository/memory"
-	"DistributedCalc/internal/orchestrator/service"
-	"DistributedCalc/internal/orchestrator/transport/http"
-	"DistributedCalc/pkg/models"
 	"context"
+	"github.com/distributed-calc/v1/internal/orchestrator/adapters/queue"
+	"github.com/distributed-calc/v1/internal/orchestrator/config"
+	"github.com/distributed-calc/v1/internal/orchestrator/repository/memory"
+	"github.com/distributed-calc/v1/internal/orchestrator/service"
+	"github.com/distributed-calc/v1/internal/orchestrator/transport/http"
+	"github.com/distributed-calc/v1/pkg/models"
 	"go.uber.org/zap"
 	"log"
 	"os/signal"

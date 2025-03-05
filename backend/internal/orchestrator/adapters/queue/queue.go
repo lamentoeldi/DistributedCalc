@@ -1,8 +1,8 @@
 package queue
 
 import (
-	"DistributedCalc/pkg/models"
 	"context"
+	"github.com/distributed-calc/v1/pkg/models"
 )
 
 type QueueChan[T any] struct {

@@ -1,7 +1,7 @@
 package service
 
 import (
-	"DistributedCalc/pkg/models"
+	"github.com/distributed-calc/v1/pkg/models"
 	"testing"
 )
 

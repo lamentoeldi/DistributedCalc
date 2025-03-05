@@ -1,11 +1,11 @@
 package orchestrator
 
 import (
-	"DistributedCalc/pkg/models"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/distributed-calc/v1/pkg/models"
 	"net/http"
 	"time"
 )

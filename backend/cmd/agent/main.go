@@ -1,11 +1,11 @@
 package main
 
 import (
-	"DistributedCalc/internal/agent/adapters/orchestrator"
-	"DistributedCalc/internal/agent/config"
-	"DistributedCalc/internal/agent/service"
-	"DistributedCalc/internal/agent/transport/async"
 	"context"
+	"github.com/distributed-calc/v1/internal/agent/adapters/orchestrator"
+	"github.com/distributed-calc/v1/internal/agent/config"
+	"github.com/distributed-calc/v1/internal/agent/service"
+	"github.com/distributed-calc/v1/internal/agent/transport/async"
 	"go.uber.org/zap"
 	"log"
 	"net/http"
