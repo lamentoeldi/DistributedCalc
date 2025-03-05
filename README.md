@@ -14,8 +14,8 @@ Also, the web-interface is provided
    - [Start Up](#start-up)
      - [Command Line](#command-line)
      - [Taskfile](#taskfile)
-     - [Docker Compose](#docker-compose)
      - [Docker CLI](#docker-cli)
+     - [Docker Compose](#docker-compose)
 2. [Services](#services)
    - [Orchestrator](#orchestrator)
    - [Agent](#agent)
@@ -130,6 +130,7 @@ docker compose up
 ```
 
 # Services
+<iframe width="768" height="432" src="https://miro.com/app/live-embed/uXjVIVAICe8=/?moveToViewport=673,313,783,588&embedId=136802335814" frameborder="0" scrolling="no" allow="fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe>
 
 ## Orchestrator
 Orchestrator is a master node of calculation cluster
@@ -203,9 +204,9 @@ NOTICE: Due to Next.js specifics, `BACKEND_URL` must be a build argument, not an
 ## Expressions
 1. During the evaluation, field `result` in Expressions schema is `0` until expressionTable is evaluated
 2. May have several statuses:
-   - `pending`: the expressionTable is being processed
-   - `completed`: the expressionTable is processed and result is ready for use
-   - `failed`: the system failed to process the expressionTable
+   - `pending`: the expression is being processed
+   - `completed`: the expression is processed and result is ready for use
+   - `failed`: the system failed to process the expression
 
 # Examples of Use
 - [API Specification](backend/api/v1/api.yaml)
