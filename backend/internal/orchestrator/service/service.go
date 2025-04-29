@@ -15,6 +15,17 @@ const (
 	StatusFailed    = "failed"
 )
 
+type task struct {
+	id       string
+	leftID   string
+	rightID  string
+	arg1     *float64
+	arg2     *float64
+	operator string
+	result   *float64
+	topLevel bool
+}
+
 type TaskPlanner interface {
 	PlanTask(ctx context.Context, task *models.Task) (TaskPromise, error)
 	FinishTask(ctx context.Context, res *models.TaskResult) error
@@ -370,4 +381,72 @@ func (s *Service) evaluateAST(node *node) (float64, error) {
 	}
 
 	return p.WaitForResult(context.TODO())
+}
+
+func (s *Service) taskAST(n *node) ([]*task, error) {
+	tasks := make([]*task, 0)
+
+	var checkNode func(node *node) (*task, error)
+	checkNode = func(in *node) (*task, error) {
+		if in.left == nil && in.right == nil {
+			taskID := uuid.NewString()
+
+			res, err := strconv.ParseFloat(in.value.value, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			t := &task{
+				id:       taskID,
+				operator: "none",
+				result:   &res,
+			}
+
+			tasks = append(tasks, t)
+
+			return t, nil
+		}
+
+		leftID, err := checkNode(in.left)
+		if err != nil {
+			return nil, err
+		}
+
+		rightID, err := checkNode(in.right)
+		if err != nil {
+			return nil, err
+		}
+
+		taskID := uuid.NewString()
+
+		t := &task{
+			id:       taskID,
+			leftID:   leftID.id,
+			rightID:  rightID.id,
+			operator: in.value.value,
+		}
+
+		if leftID.operator == "none" {
+			t.arg1 = leftID.result
+		}
+
+		if rightID.operator == "none" {
+			t.arg2 = rightID.result
+		}
+
+		tasks = append(tasks, t)
+
+		return t, nil
+	}
+
+	_, err := checkNode(n)
+	if err != nil {
+		return nil, err
+	}
+
+	// Mark the top level node (it is always the last node)
+	last := len(tasks) - 1
+	tasks[last].topLevel = true
+
+	return tasks, nil
 }
