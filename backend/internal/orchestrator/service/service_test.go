@@ -447,3 +447,108 @@ func TestService_GetAll(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestTaskAST(t *testing.T) {
+	cases := []struct {
+		name       string
+		expression string
+		expected   float64
+		wantErr    bool
+	}{
+		{
+			name:       "simple expression",
+			expression: "2+2",
+			expected:   4,
+			wantErr:    false,
+		},
+		{
+			name:       "expression with parenthesis",
+			expression: "(2+2)*3",
+			expected:   12,
+			wantErr:    false,
+		},
+		{
+			name:       "expression with operator priority",
+			expression: "2*2+3",
+			expected:   7,
+			wantErr:    false,
+		},
+		{
+			name:       "expression with float numbers",
+			expression: "3.14+2",
+			expected:   5.14,
+			wantErr:    false,
+		},
+		{
+			name:       "expression with nested parenthesis",
+			expression: "((2+3)*2)+1",
+			expected:   11,
+			wantErr:    false,
+		},
+		{
+			name:       "expression with paralleled tasks",
+			expression: "(2+3)*(4+1)",
+			expected:   25,
+			wantErr:    false,
+		},
+		{
+			name:       "expression with more paralleled tasks",
+			expression: "(2+3)*(4+1)+(5+1)*(5+5)",
+			expected:   85,
+			wantErr:    false,
+		},
+		{
+			name:       "negative unary expression",
+			expression: "-2",
+			expected:   -2,
+			wantErr:    false,
+		},
+		{
+			name:       "positive unary expression",
+			expression: "2",
+			expected:   2,
+			wantErr:    false,
+		},
+	}
+
+	s := NewService(nil, nil, nil)
+
+	for _, tc := range cases {
+		tokens, err := s.tokenize(tc.expression)
+		if err != nil {
+			t.Error(err)
+		}
+
+		ast, err := s.buildAST(tokens)
+		if err != nil {
+			t.Error(err)
+		}
+
+		tasks, err := s.taskAST(ast)
+		if err != nil {
+			t.Error(err)
+		}
+
+		_ = ast
+		if err != nil {
+			t.Error("failed to build AST")
+		}
+
+		for _, ta := range tasks {
+			toPrint := fmt.Sprintf("%s %s %s %s %v", ta.id, ta.leftID, ta.rightID, ta.operator, ta.topLevel)
+			if ta.arg1 != nil {
+				toPrint += fmt.Sprintf(" %.2f", *ta.arg1)
+			}
+
+			if ta.arg2 != nil {
+				toPrint += fmt.Sprintf(" %.2f", *ta.arg2)
+			}
+
+			if ta.result != nil {
+				toPrint += fmt.Sprintf(" %.2f", *ta.result)
+			}
+
+			fmt.Println(toPrint)
+		}
+	}
+}
