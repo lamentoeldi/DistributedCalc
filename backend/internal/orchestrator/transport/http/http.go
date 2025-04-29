@@ -5,16 +5,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	errors2 "github.com/distributed-calc/v1/internal/orchestrator/errors"
+	models2 "github.com/distributed-calc/v1/internal/orchestrator/models"
 	"github.com/distributed-calc/v1/pkg/middleware"
 	"github.com/distributed-calc/v1/pkg/models"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
 	methodNotAllowed = "method not allowed"
+	requestTimeout   = 5 * time.Second
 )
 
 type Service interface {
@@ -24,6 +28,8 @@ type Service interface {
 	FinishTask(ctx context.Context, result *models.TaskResult) error
 	Enqueue(ctx context.Context, task *models.Task) error
 	Dequeue(ctx context.Context) (*models.Task, error)
+	Register(ctx context.Context, creds *models2.UserCredentials) error
+	Login(ctx context.Context, creds *models2.UserCredentials) (*models2.JWTTokens, error)
 }
 
 type TransportHttpConfig struct {
@@ -49,12 +55,27 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *Tra
 		Port: cfg.Port,
 	}
 
-	t.mux.Handle("/api/v1/calculate", middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleCalculate))))
-	t.mux.Handle("/api/v1/expressions", middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleExpressions))))
-	t.mux.Handle("/api/v1/expressions/", middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleExpression))))
+	t.mux.
+		Handle(
+			"/api/v1/calculate",
+			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleCalculate))))
+	t.mux.
+		Handle(
+			"/api/v1/expressions",
+			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleExpressions))))
+	t.mux.
+		Handle(
+			"/api/v1/expressions/",
+			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleExpression))))
 
-	t.mux.Handle("/internal/ping", middleware.MwRecover(log, http.HandlerFunc(t.handlePing)))
-	t.mux.Handle("/internal/task", middleware.MwRecover(log, http.HandlerFunc(t.handleTask)))
+	t.mux.
+		Handle(
+			"/api/v1/register",
+			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleRegister))))
+	t.mux.
+		Handle(
+			"/api/v1/login",
+			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleLogin))))
 
 	return t
 }
@@ -69,8 +90,8 @@ func (t *TransportHttp) handlePing(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) {
-	reqID := r.Context().Value("request_id")
-	log := t.log.With(zap.Any("request_id", reqID))
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
 
 	if r.Method != "POST" {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
@@ -80,14 +101,14 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 	var exp *models.Calculation
 	err := json.NewDecoder(r.Body).Decode(&exp)
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	id, err := t.s.StartEvaluation(r.Context(), exp.Expression)
+	id, err := t.s.StartEvaluation(ctx, exp.Expression)
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 
 		switch {
 		case errors.Is(err, models.ErrInvalidExpression):
@@ -103,31 +124,26 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 		"id": id,
 	})
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	_, err = w.Write(data)
-	if err != nil {
-		log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	_, _ = w.Write(data)
 }
 
 func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request) {
-	reqID := r.Context().Value("request_id")
-	log := t.log.With(zap.Any("request_id", reqID))
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
 
 	if r.Method != "GET" {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 	}
 
-	exp, err := t.s.GetAll(r.Context())
+	exp, err := t.s.GetAll(ctx)
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 
 		switch {
 		case errors.Is(err, models.ErrNoExpressions):
@@ -148,22 +164,17 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 		"expressions": exp,
 	})
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = w.Write(data)
-	if err != nil {
-		log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	_, _ = w.Write(data)
 }
 
 func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request) {
-	reqID := r.Context().Value("request_id")
-	log := t.log.With(zap.Any("request_id", reqID))
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
 
 	if r.Method != "GET" {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
@@ -175,14 +186,14 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 	// To ensure uuid is valid
 	id, err := uuid.Parse(routes[len(routes)-1])
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
-	exp, err := t.s.Get(r.Context(), id.String())
+	exp, err := t.s.Get(ctx, id.String())
 	if err != nil {
-		log.Error(err.Error(), zap.String("exp_id", id.String()))
+		t.log.Error(err.Error(), zap.String("exp_id", id.String()))
 
 		switch {
 		case errors.Is(err, models.ErrExpressionDoesNotExist):
@@ -198,79 +209,70 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 		"expression": exp,
 	})
 
-	_, err = w.Write(data)
-	if err != nil {
-		log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	_, _ = w.Write(data)
 }
 
-func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case "GET":
-		t.handleGetTask(w, r)
-	case "POST":
-		t.handlePostResult(w, r)
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	}
-}
+func (t *TransportHttp) handleRegister(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
 
-func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
-	task, err := t.s.Dequeue(r.Context())
-	switch {
-	case errors.Is(err, models.ErrNoTasks):
-		t.log.Debug(err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	case err != nil:
-		t.log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	data, err := json.Marshal(struct {
-		Task *models.Task `json:"task"`
-	}{
-		Task: task,
-	})
-	if err != nil {
-		t.log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(data)
-	if err != nil {
-		t.log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func (t *TransportHttp) handlePostResult(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	var result *models.TaskResult
-
-	err := json.NewDecoder(r.Body).Decode(&result)
+	var creds models2.UserCredentials
+	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err = t.s.FinishTask(r.Context(), result)
-	switch {
-	case errors.Is(err, models.ErrExpressionDoesNotExist):
+	err = t.s.Register(ctx, &creds)
+	if err != nil {
 		t.log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
+
+		switch {
+		case errors.Is(err, errors2.ErrBadRequest):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, errors2.ErrConflict):
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+func (t *TransportHttp) handleLogin(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
+
+	defer r.Body.Close()
+
+	var creds models2.UserCredentials
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil {
+		t.log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	case err != nil:
+	}
+
+	tokens, err := t.s.Login(ctx, &creds)
+	if err != nil {
+		t.log.Error(err.Error())
+
+		switch {
+		case errors.Is(err, errors2.ErrUnauthorized):
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(tokens)
+	if err != nil {
 		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 }
 
