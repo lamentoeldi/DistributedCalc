@@ -60,11 +60,11 @@ func (r *RepositoryMemory) AddUser(_ context.Context, user *models2.User) error 
 	r.usersMu.Lock()
 	defer r.usersMu.Unlock()
 
-	r.users[user.Id] = user
+	r.users[user.Username] = user
 	return nil
 }
 
-func (r *RepositoryMemory) GetUser(ctx context.Context, login string) (*models2.User, error) {
+func (r *RepositoryMemory) GetUser(_ context.Context, login string) (*models2.User, error) {
 	r.usersMu.RLock()
 	user, ok := r.users[login]
 	r.usersMu.RUnlock()

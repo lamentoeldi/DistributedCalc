@@ -93,7 +93,7 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
@@ -137,7 +137,7 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
-	if r.Method != "GET" {
+	if r.Method != http.MethodGet {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 	}
 
@@ -176,7 +176,7 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
-	if r.Method != "GET" {
+	if r.Method != http.MethodGet {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
@@ -216,6 +216,11 @@ func (t *TransportHttp) handleRegister(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
+	if r.Method != http.MethodPost {
+		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+		return
+	}
+
 	defer r.Body.Close()
 
 	var creds models2.UserCredentials
@@ -244,6 +249,11 @@ func (t *TransportHttp) handleRegister(w http.ResponseWriter, r *http.Request) {
 func (t *TransportHttp) handleLogin(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
+
+	if r.Method != http.MethodPost {
+		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+		return
+	}
 
 	defer r.Body.Close()
 
