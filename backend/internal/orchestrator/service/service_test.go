@@ -392,7 +392,7 @@ func TestService_Get(t *testing.T) {
 		},
 	}
 
-	err := s.r.Add(context.Background(), &models.Expression{
+	err := s.repo.Add(context.Background(), &models.Expression{
 		Id:     found,
 		Status: "testing",
 		Result: 0,
@@ -437,7 +437,7 @@ func TestService_GetAll(t *testing.T) {
 		Result: 0,
 	}
 
-	err := s.r.Add(context.Background(), exp)
+	err := s.repo.Add(context.Background(), exp)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

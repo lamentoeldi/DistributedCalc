@@ -3,8 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
+	errors2 "github.com/distributed-calc/v1/internal/orchestrator/errors"
+	models2 "github.com/distributed-calc/v1/internal/orchestrator/models"
+	"github.com/distributed-calc/v1/pkg/authenticator"
 	"github.com/distributed-calc/v1/pkg/models"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 	"strconv"
 	"unicode"
 )
@@ -39,6 +43,8 @@ type Repository interface {
 	Add(ctx context.Context, exp *models.Expression) error
 	Get(ctx context.Context, id string) (*models.Expression, error)
 	GetAll(ctx context.Context) ([]*models.Expression, error)
+	AddUser(ctx context.Context, user *models2.User) error
+	GetUser(ctx context.Context, login string) (*models2.User, error)
 }
 
 type Queue[T any] interface {
@@ -47,17 +53,18 @@ type Queue[T any] interface {
 }
 
 type Service struct {
-	r Repository
-	p TaskPlanner
-	q Queue[models.Task]
+	repo Repository
+	p    TaskPlanner
+	q    Queue[models.Task]
+	auth *authenticator.Authenticator
 }
 
-func NewService(r Repository, p TaskPlanner, q Queue[models.Task]) *Service {
+func NewService(r Repository, p TaskPlanner, q Queue[models.Task]) (*Service, error) {
 	return &Service{
-		r: r,
-		p: p,
-		q: q,
-	}
+		repo: r,
+		p:    p,
+		q:    q,
+	}, nil
 }
 
 func (s *Service) StartEvaluation(ctx context.Context, expression string) (string, error) {
@@ -80,17 +87,17 @@ func (s *Service) StartEvaluation(ctx context.Context, expression string) (strin
 		Result: 0,
 	}
 
-	err = s.r.Add(context.TODO(), exp)
+	err = s.repo.Add(context.TODO(), exp)
 	if err != nil {
 		return "", err
 	}
 
 	// In non-blocking part, further calculation is initiated
 	go func(exp *models.Expression) {
-		res, err := s.evaluateAST(ast)
+		res, err := s.taskAST(ast)
 		if err != nil {
 			exp.Status = StatusFailed
-			_ = s.r.Add(ctx, exp)
+			_ = s.repo.Add(ctx, exp)
 			return
 		}
 
@@ -98,20 +105,23 @@ func (s *Service) StartEvaluation(ctx context.Context, expression string) (strin
 
 		// Throw away excessive decimal places
 		// It is ok ignoring this error since it may occur only if call above failed
-		res, _ = strconv.ParseFloat(fmt.Sprintf("%.8f", res), 64)
-		exp.Result = res
-		_ = s.r.Add(ctx, exp)
+		//res, _ = strconv.ParseFloat(fmt.Sprintf("%.8f", res), 64)
+		//exp.Result = res
+		//_ = s.repo.Add(ctx, exp)
+
+		// TODO: Task creation
+		_ = res
 	}(exp)
 
 	return id, nil
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*models.Expression, error) {
-	return s.r.Get(ctx, id)
+	return s.repo.Get(ctx, id)
 }
 
 func (s *Service) GetAll(ctx context.Context) ([]*models.Expression, error) {
-	return s.r.GetAll(ctx)
+	return s.repo.GetAll(ctx)
 }
 
 func (s *Service) FinishTask(ctx context.Context, result *models.TaskResult) error {
@@ -322,67 +332,6 @@ func (s *Service) buildAST(tokens []token) (*node, error) {
 	return nil, models.ErrInvalidExpression
 }
 
-func (s *Service) evaluateAST(node *node) (float64, error) {
-	if node.left == nil && node.right == nil {
-		return strconv.ParseFloat(node.value.value, 64)
-	}
-
-	// All this goroutine bullshit may cause race, demands test
-
-	chLeft := make(chan float64)
-	chRight := make(chan float64)
-	chErr := make(chan error)
-
-	go func() {
-		lRes, err := s.evaluateAST(node.left)
-		if err != nil {
-			chLeft <- 0
-			chErr <- err
-			return
-		}
-
-		chLeft <- lRes
-		chErr <- nil
-	}()
-
-	go func() {
-		rRes, err := s.evaluateAST(node.right)
-		if err != nil {
-			chRight <- 0
-			chErr <- err
-			return
-		}
-
-		chRight <- rRes
-		chErr <- nil
-	}()
-
-	leftResult := <-chLeft
-	rightResult := <-chRight
-
-	select {
-	case err := <-chErr:
-		if err != nil {
-			return 0, err
-		}
-	default:
-	}
-
-	// Pass this to channel, block until get result
-	t := &models.Task{
-		Arg1:      leftResult,
-		Arg2:      rightResult,
-		Operation: node.value.value,
-	}
-
-	p, err := s.p.PlanTask(context.TODO(), t)
-	if err != nil {
-		return 0, err
-	}
-
-	return p.WaitForResult(context.TODO())
-}
-
 func (s *Service) taskAST(n *node) ([]*task, error) {
 	tasks := make([]*task, 0)
 
@@ -449,4 +398,48 @@ func (s *Service) taskAST(n *node) ([]*task, error) {
 	tasks[last].topLevel = true
 
 	return tasks, nil
+}
+
+func (s *Service) Register(ctx context.Context, creds *models2.UserCredentials) error {
+	id, _ := uuid.NewV7()
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(creds.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to register user: %w", err)
+	}
+
+	user := &models2.User{
+		Id:             id.String(),
+		Username:       creds.Username,
+		HashedPassword: hash,
+	}
+
+	err = s.repo.AddUser(ctx, user)
+	if err != nil {
+		return fmt.Errorf("failed to register user: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) Login(ctx context.Context, creds *models2.UserCredentials) (*models2.JWTTokens, error) {
+	user, err := s.repo.GetUser(ctx, creds.Username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authorize user: %w: %w", errors2.ErrUnauthorized, err)
+	}
+
+	err = bcrypt.CompareHashAndPassword(user.HashedPassword, []byte(creds.Password))
+	if err != nil {
+		return nil, fmt.Errorf("failed to authorize user: %w: %w", errors2.ErrUnauthorized, err)
+	}
+
+	access, refresh, err := s.auth.SignTokens(s.auth.IssueTokens(user.Id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to issue tokens: %w", err)
+	}
+
+	return &models2.JWTTokens{
+		AccessToken:  access,
+		RefreshToken: refresh,
+	}, nil
 }
