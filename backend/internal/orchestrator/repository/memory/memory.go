@@ -2,33 +2,37 @@ package memory
 
 import (
 	"context"
+	models2 "github.com/distributed-calc/v1/internal/orchestrator/models"
 	"github.com/distributed-calc/v1/pkg/models"
 	"sync"
 )
 
 type RepositoryMemory struct {
-	m  map[string]*models.Expression
-	mu sync.Mutex
+	exp     map[string]*models.Expression
+	expMu   sync.RWMutex
+	users   map[string]*models2.User
+	usersMu sync.RWMutex
 }
 
 func NewRepositoryMemory() *RepositoryMemory {
 	return &RepositoryMemory{
-		m: make(map[string]*models.Expression),
+		exp:   make(map[string]*models.Expression),
+		users: make(map[string]*models2.User),
 	}
 }
 
 func (r *RepositoryMemory) Add(_ context.Context, exp *models.Expression) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.expMu.Lock()
+	defer r.expMu.Unlock()
 
-	r.m[exp.Id] = exp
+	r.exp[exp.Id] = exp
 	return nil
 }
 
 func (r *RepositoryMemory) Get(_ context.Context, id string) (*models.Expression, error) {
-	r.mu.Lock()
-	val, ok := r.m[id]
-	r.mu.Unlock()
+	r.expMu.RLock()
+	val, ok := r.exp[id]
+	r.expMu.RUnlock()
 	if !ok {
 		return nil, models.ErrExpressionDoesNotExist
 	}
@@ -39,15 +43,34 @@ func (r *RepositoryMemory) Get(_ context.Context, id string) (*models.Expression
 func (r *RepositoryMemory) GetAll(_ context.Context) ([]*models.Expression, error) {
 	expressions := make([]*models.Expression, 0)
 
-	r.mu.Lock()
-	for _, val := range r.m {
+	r.expMu.RLock()
+	for _, val := range r.exp {
 		expressions = append(expressions, val)
 	}
-	r.mu.Unlock()
+	r.expMu.RUnlock()
 
 	if len(expressions) < 1 {
 		return nil, models.ErrNoExpressions
 	}
 
 	return expressions, nil
+}
+
+func (r *RepositoryMemory) AddUser(_ context.Context, user *models2.User) error {
+	r.usersMu.Lock()
+	defer r.usersMu.Unlock()
+
+	r.users[user.Id] = user
+	return nil
+}
+
+func (r *RepositoryMemory) GetUser(ctx context.Context, login string) (*models2.User, error) {
+	r.usersMu.RLock()
+	user, ok := r.users[login]
+	r.usersMu.RUnlock()
+	if !ok {
+		return nil, models.ErrExpressionDoesNotExist
+	}
+
+	return user, nil
 }

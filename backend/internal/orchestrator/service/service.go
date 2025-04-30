@@ -59,12 +59,13 @@ type Service struct {
 	auth *authenticator.Authenticator
 }
 
-func NewService(r Repository, p TaskPlanner, q Queue[models.Task]) (*Service, error) {
+func NewService(r Repository, p TaskPlanner, q Queue[models.Task], auth *authenticator.Authenticator) *Service {
 	return &Service{
 		repo: r,
 		p:    p,
 		q:    q,
-	}, nil
+		auth: auth,
+	}
 }
 
 func (s *Service) StartEvaluation(ctx context.Context, expression string) (string, error) {
