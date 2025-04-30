@@ -30,6 +30,8 @@ type Service interface {
 	Dequeue(ctx context.Context) (*models.Task, error)
 	Register(ctx context.Context, creds *models2.UserCredentials) error
 	Login(ctx context.Context, creds *models2.UserCredentials) (*models2.JWTTokens, error)
+
+	middleware.Auth
 }
 
 type TransportHttpConfig struct {
@@ -58,15 +60,21 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *Tra
 	t.mux.
 		Handle(
 			"/api/v1/calculate",
-			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleCalculate))))
+			middleware.MwLogger(log,
+				middleware.MwRecover(log,
+					middleware.MwAuth(log, s, http.HandlerFunc(t.handleCalculate)))))
 	t.mux.
 		Handle(
 			"/api/v1/expressions",
-			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleExpressions))))
+			middleware.MwLogger(log,
+				middleware.MwRecover(log,
+					middleware.MwAuth(log, s, http.HandlerFunc(t.handleCalculate)))))
 	t.mux.
 		Handle(
 			"/api/v1/expressions/",
-			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleExpression))))
+			middleware.MwLogger(log,
+				middleware.MwRecover(log,
+					middleware.MwAuth(log, s, http.HandlerFunc(t.handleCalculate)))))
 
 	t.mux.
 		Handle(

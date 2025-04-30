@@ -57,7 +57,7 @@ func main() {
 		Port: cfg.Port,
 	}
 
-	transport := http.NewTransportHttp(app, logger, transportCfg)
+	transport := http.NewTransportHttp(app, logger, transportCfg, auth)
 
 	transport.Run()
 
