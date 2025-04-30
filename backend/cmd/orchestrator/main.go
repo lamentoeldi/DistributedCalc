@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"github.com/distributed-calc/v1/internal/orchestrator/adapters/queue"
+	memory2 "github.com/distributed-calc/v1/internal/orchestrator/blacklist/memory"
 	"github.com/distributed-calc/v1/internal/orchestrator/config"
 	"github.com/distributed-calc/v1/internal/orchestrator/repository/memory"
 	"github.com/distributed-calc/v1/internal/orchestrator/service"
@@ -48,16 +49,17 @@ func main() {
 	refreshTTL := 7 * 24 * time.Hour
 
 	rep := memory.NewRepositoryMemory()
+	bl := memory2.NewBlacklist()
 	planner := service.NewPlannerChan(cfg, q)
 	auth := authenticator.NewAuthenticator(accessPk, refreshPk, accessTTL, refreshTTL)
-	app := service.NewService(rep, planner, q, auth)
+	app := service.NewService(rep, planner, q, auth, bl)
 
 	transportCfg := &http.TransportHttpConfig{
 		Host: cfg.Host,
 		Port: cfg.Port,
 	}
 
-	transport := http.NewTransportHttp(app, logger, transportCfg, auth)
+	transport := http.NewTransportHttp(app, logger, transportCfg)
 
 	transport.Run()
 

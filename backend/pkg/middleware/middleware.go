@@ -2,12 +2,17 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
 	"strings"
 	"time"
+)
+
+var (
+	ErrTokenWasRevoked = fmt.Errorf("token was revoked")
 )
 
 type Auth interface {
@@ -65,10 +70,16 @@ func MwAuth(log *zap.Logger, auth Auth, next http.Handler) http.Handler {
 			return
 		}
 
-		newAccess, newRefresh, err := auth.RefreshTokens(ctx, access)
+		newAccess, newRefresh, err := auth.RefreshTokens(ctx, refresh)
 		if err != nil {
 			log.Error("failed to refresh access token", zap.Error(err))
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+
+			switch {
+			case errors.Is(err, ErrTokenWasRevoked):
+				http.Error(w, "token was revoked", http.StatusUnauthorized)
+			default:
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+			}
 			return
 		}
 

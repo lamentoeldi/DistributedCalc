@@ -6,7 +6,9 @@ import (
 	errors2 "github.com/distributed-calc/v1/internal/orchestrator/errors"
 	models2 "github.com/distributed-calc/v1/internal/orchestrator/models"
 	"github.com/distributed-calc/v1/pkg/authenticator"
+	"github.com/distributed-calc/v1/pkg/middleware"
 	"github.com/distributed-calc/v1/pkg/models"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"strconv"
@@ -47,6 +49,12 @@ type Repository interface {
 	GetUser(ctx context.Context, login string) (*models2.User, error)
 }
 
+type BlackList interface {
+	Add(ctx context.Context, tokenID string) error
+	Remove(ctx context.Context, tokenID string) error
+	IsBlackListed(ctx context.Context, tokenID string) (bool, error)
+}
+
 type Queue[T any] interface {
 	Enqueue(ctx context.Context, obj *T) error
 	Dequeue(ctx context.Context) (*T, error)
@@ -54,17 +62,19 @@ type Queue[T any] interface {
 
 type Service struct {
 	repo Repository
+	bl   BlackList
 	p    TaskPlanner
 	q    Queue[models.Task]
 	auth *authenticator.Authenticator
 }
 
-func NewService(r Repository, p TaskPlanner, q Queue[models.Task], auth *authenticator.Authenticator) *Service {
+func NewService(r Repository, p TaskPlanner, q Queue[models.Task], auth *authenticator.Authenticator, bl BlackList) *Service {
 	return &Service{
 		repo: r,
 		p:    p,
 		q:    q,
 		auth: auth,
+		bl:   bl,
 	}
 }
 
@@ -443,4 +453,51 @@ func (s *Service) Login(ctx context.Context, creds *models2.UserCredentials) (*m
 		AccessToken:  access,
 		RefreshToken: refresh,
 	}, nil
+}
+
+func (s *Service) VerifyJWT(_ context.Context, token string) error {
+	_, err := s.auth.VerifyAndExtract(token)
+	if err != nil {
+		return fmt.Errorf("failed to verify jwt token: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) RefreshTokens(ctx context.Context, token string) (string, string, error) {
+	claims, err := s.auth.VerifyAndExtract(token)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to verify jwt token: %w", err)
+	}
+
+	jti, ok := claims.(jwt.MapClaims)["jti"].(string)
+	if !ok {
+		return "", "", fmt.Errorf("failed to extract jti")
+	}
+
+	isBlacklisted, err := s.bl.IsBlackListed(ctx, jti)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to check blacklist: %w", err)
+	}
+
+	if isBlacklisted {
+		return "", "", fmt.Errorf("%w", middleware.ErrTokenWasRevoked)
+	}
+
+	sub, err := claims.GetSubject()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to extract subject: %w", err)
+	}
+
+	access, refresh, err := s.auth.SignTokens(s.auth.IssueTokens(sub))
+	if err != nil {
+		return "", "", fmt.Errorf("failed to refresh tokens: %w", err)
+	}
+
+	err = s.bl.Add(ctx, jti)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to revoke old refresh token: %w", err)
+	}
+
+	return access, refresh, nil
 }

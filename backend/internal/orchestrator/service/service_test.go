@@ -2,10 +2,15 @@ package service
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"fmt"
 	"github.com/distributed-calc/v1/internal/orchestrator/adapters/queue"
+	memory2 "github.com/distributed-calc/v1/internal/orchestrator/blacklist/memory"
 	"github.com/distributed-calc/v1/internal/orchestrator/config"
 	"github.com/distributed-calc/v1/internal/orchestrator/repository/memory"
+	"github.com/distributed-calc/v1/pkg/authenticator"
 	"github.com/distributed-calc/v1/pkg/models"
 	"github.com/google/uuid"
 	"testing"
@@ -13,7 +18,7 @@ import (
 )
 
 func TestService_tokenize(t *testing.T) {
-	s := NewService(nil, nil, nil, nil)
+	s := NewService(nil, nil, nil, nil, nil)
 
 	cases := []struct {
 		name    string
@@ -107,7 +112,7 @@ func TestService_tokenize(t *testing.T) {
 }
 
 func TestService_buildAST(t *testing.T) {
-	s := NewService(nil, nil, nil, nil)
+	s := NewService(nil, nil, nil, nil, nil)
 
 	cases := []struct {
 		name       string
@@ -181,7 +186,7 @@ func TestService_StartEvaluation(t *testing.T) {
 	r := memory.NewRepositoryMemory()
 	q := queue.NewQueueChan[models.Task](64)
 	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p, q, nil)
+	s := NewService(r, p, q, nil, nil)
 
 	cases := []struct {
 		name       string
@@ -229,7 +234,7 @@ func TestService_Get(t *testing.T) {
 	r := memory.NewRepositoryMemory()
 	q := queue.NewQueueChan[models.Task](64)
 	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p, q, nil)
+	s := NewService(r, p, q, nil, nil)
 
 	found := uuid.NewString()
 
@@ -287,7 +292,7 @@ func TestService_GetAll(t *testing.T) {
 	r := memory.NewRepositoryMemory()
 	q := queue.NewQueueChan[models.Task](64)
 	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p, q, nil)
+	s := NewService(r, p, q, nil, nil)
 
 	exp := &models.Expression{
 		Id:     uuid.NewString(),
@@ -369,7 +374,7 @@ func TestTaskAST(t *testing.T) {
 		},
 	}
 
-	s := NewService(nil, nil, nil, nil)
+	s := NewService(nil, nil, nil, nil, nil)
 
 	for _, tc := range cases {
 		tokens, err := s.tokenize(tc.expression)
@@ -408,5 +413,90 @@ func TestTaskAST(t *testing.T) {
 
 			fmt.Println(toPrint)
 		}
+	}
+}
+
+func TestService_VerifyJWT(t *testing.T) {
+	accessPk, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	refreshPk, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	s := NewService(
+		memory.NewRepositoryMemory(),
+		nil, nil,
+		authenticator.NewAuthenticator(accessPk, refreshPk, 10*time.Second, 60*time.Second),
+		memory2.NewBlacklist(),
+	)
+
+	cases := []struct {
+		name    string
+		wantErr bool
+	}{
+		{
+			name:    "success",
+			wantErr: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, refresh, err := s.auth.SignTokens(s.auth.IssueTokens("dqd"))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.VerifyJWT(context.Background(), refresh)
+			if tc.wantErr == false && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+
+			if tc.wantErr == true && err == nil {
+				t.Error("expected error, got none")
+			}
+		})
+	}
+}
+
+func TestService_RefreshTokens(t *testing.T) {
+	accessPk, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	refreshPk, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	s := NewService(
+		memory.NewRepositoryMemory(),
+		nil, nil,
+		authenticator.NewAuthenticator(accessPk, refreshPk, 10*time.Second, 60*time.Second),
+		memory2.NewBlacklist(),
+	)
+
+	cases := []struct {
+		name    string
+		wantErr bool
+	}{
+		{
+			name:    "success",
+			wantErr: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, refresh, err := s.auth.SignTokens(s.auth.IssueTokens("dqd"))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, refresh, err = s.RefreshTokens(context.Background(), refresh)
+			if tc.wantErr == false && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+
+			if tc.wantErr == true && err == nil {
+				t.Error("expected error, got none")
+			}
+
+			err = s.VerifyJWT(context.Background(), refresh)
+			if tc.wantErr == true && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+		})
 	}
 }

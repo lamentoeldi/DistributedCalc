@@ -68,7 +68,7 @@ func (a *Authenticator) SignTokens(access, refresh *jwt.Token) (string, string, 
 }
 
 func (a *Authenticator) VerifyAndExtract(tokenString string) (jwt.Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &jwt.MapClaims{}, a.keyFunc)
+	token, err := jwt.ParseWithClaims(tokenString, jwt.MapClaims{}, a.keyFunc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
