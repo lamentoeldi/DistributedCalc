@@ -2,16 +2,21 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"github.com/distributed-calc/v1/internal/orchestrator/adapters/queue"
+	memory2 "github.com/distributed-calc/v1/internal/orchestrator/blacklist/memory"
 	"github.com/distributed-calc/v1/internal/orchestrator/config"
 	"github.com/distributed-calc/v1/internal/orchestrator/repository/memory"
 	"github.com/distributed-calc/v1/internal/orchestrator/service"
 	"github.com/distributed-calc/v1/internal/orchestrator/transport/http"
+	"github.com/distributed-calc/v1/pkg/authenticator"
 	"github.com/distributed-calc/v1/pkg/models"
 	"go.uber.org/zap"
-	"log"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -19,25 +24,35 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	logger, _ := zap.NewDevelopment()
+
 	cfg, err := config.NewConfig()
 	if err != nil {
 		lg, _ := zap.NewProduction()
 		lg.Fatal(err.Error())
 	}
 
-	logConfig := zap.NewProductionConfig()
-	logConfig.Level = zap.NewAtomicLevelAt(cfg.LogLevel)
-
-	logger, err := logConfig.Build()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	q := queue.NewQueueChan[models.Task](64)
 
+	// TODO: read from config
+	accessPk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		logger.Fatal("failed to start", zap.Error(err))
+	}
+
+	refreshPk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		logger.Fatal("failed to start", zap.Error(err))
+	}
+
+	accessTTL := 10 * time.Minute
+	refreshTTL := 7 * 24 * time.Hour
+
 	rep := memory.NewRepositoryMemory()
+	bl := memory2.NewBlacklist()
 	planner := service.NewPlannerChan(cfg, q)
-	app := service.NewService(rep, planner, q)
+	auth := authenticator.NewAuthenticator(accessPk, refreshPk, accessTTL, refreshTTL)
+	app := service.NewService(rep, planner, q, auth, bl)
 
 	transportCfg := &http.TransportHttpConfig{
 		Host: cfg.Host,
