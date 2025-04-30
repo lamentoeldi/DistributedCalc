@@ -15,8 +15,6 @@ services:
       - TIME_MULTIPLICATION_MS=1
       - TIME_DIVISION_MS=1
       - LOG_LEVEL=info
-    ports:
-      - '8080:8080' # Orchestrator remains open to external connections for test purposes
   agent:
     build:
       dockerfile:
@@ -41,3 +39,9 @@ services:
         BACKEND_URL: http://orchestrator:8080
     ports:
       - '3000:3000'
+  nginx:
+    image: nginx:1.27.5-alpine
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - '8080:80'
