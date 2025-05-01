@@ -222,7 +222,7 @@ func TestService_Get(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := s.Get(context.Background(), tc.id)
+			_, err := s.Get(context.Background(), tc.id, "")
 			if tc.wantErr == false && err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
@@ -249,7 +249,7 @@ func TestService_GetAll(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = s.GetAll(context.Background())
+	_, err = s.GetAll(context.Background(), "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
