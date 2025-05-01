@@ -72,10 +72,11 @@ func (rm *RepositoryMemory) GetTask(_ context.Context) (*models.Task, error) {
 	defer rm.taskMu.RUnlock()
 	for _, task := range rm.taskM {
 		if task.Status == "ready" {
+			delete(rm.taskM, task.ID)
 			return task, nil
 		}
 	}
-	return nil, fmt.Errorf("no ready task found")
+	return nil, fmt.Errorf("%w: no ready task found", errors.ErrNoTasks)
 }
 
 func (rm *RepositoryMemory) UpdateTask(_ context.Context, task *models.Task) error {
@@ -118,7 +119,7 @@ func (rm *RepositoryMemory) DeleteTasks(_ context.Context, expID string) error {
 	return nil
 }
 
-func (rm *RepositoryMemory) Update(ctx context.Context, exp *models.Expression) error {
+func (rm *RepositoryMemory) Update(_ context.Context, exp *models.Expression) error {
 	rm.expMu.Lock()
 	defer rm.expMu.Unlock()
 

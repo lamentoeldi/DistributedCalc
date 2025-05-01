@@ -80,11 +80,15 @@ func (t *TransportAsync) StartWorkers(ctx context.Context) {
 // produce takes *models.TaskResult from out channel and sends it back to the orchestrator
 func (t *TransportAsync) produce() {
 	for r := range t.out {
-		err := t.o.PostResult(context.TODO(), r)
-		if err != nil {
-			t.log.Error(err.Error())
-			continue
-		}
+		func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			err := t.o.PostResult(ctx, r)
+			if err != nil {
+				t.log.Error("failed to post result", zap.Error(err))
+			}
+		}()
 	}
 }
 
@@ -104,7 +108,7 @@ func (t *TransportAsync) consume(ctx context.Context) {
 				switch {
 				case errors.Is(err, e.ErrNoTasks):
 				default:
-					t.log.Error(err.Error())
+					t.log.Error("failed to get task", zap.Error(err))
 				}
 				break
 			}

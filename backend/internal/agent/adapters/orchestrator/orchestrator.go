@@ -75,7 +75,7 @@ func (o *Orchestrator) PostResult(ctx context.Context, result *models.TaskResult
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed status code %d", res.StatusCode)
+		return fmt.Errorf("failed to post result: request failed status code %d", res.StatusCode)
 	}
 
 	return nil

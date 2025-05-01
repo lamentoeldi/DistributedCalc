@@ -25,7 +25,6 @@ type Service interface {
 
 	GetTask(ctx context.Context) (*models.AgentTask, error)
 	FinishTask(ctx context.Context, task *models.TaskResult) error
-	Finalize(ctx context.Context, expID string, result float64) error
 }
 
 type TransportHttpConfig struct {

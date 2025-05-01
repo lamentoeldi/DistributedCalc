@@ -9,6 +9,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"strconv"
+	"strings"
 	"unicode"
 )
 
@@ -112,10 +113,21 @@ func (s *Service) FinishTask(ctx context.Context, task *models.TaskResult) error
 		return err
 	}
 
+	if !task.Final {
+		return nil
+	}
+
+	expID := strings.Split(task.Id, ":")[0]
+
+	err = s.finalize(ctx, expID, task.Result)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (s *Service) Finalize(ctx context.Context, expID string, result float64) error {
+func (s *Service) finalize(ctx context.Context, expID string, result float64) error {
 	exp := &models.Expression{
 		Id:     expID,
 		Status: StatusCompleted,
