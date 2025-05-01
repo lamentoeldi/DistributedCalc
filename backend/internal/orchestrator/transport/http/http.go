@@ -21,7 +21,7 @@ const (
 )
 
 type Service interface {
-	Evaluate(ctx context.Context, expression string) (string, error)
+	Evaluate(ctx context.Context, expression, userID string) (string, error)
 	Get(ctx context.Context, id, userID string) (*models.Expression, error)
 	GetAll(ctx context.Context, userID, cursor string) ([]*models.Expression, error)
 
@@ -120,7 +120,21 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id, err := t.s.Evaluate(ctx, exp.Expression)
+	authorization := r.Header.Get("Authorization")
+	if len(authorization) < len("Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken := strings.TrimPrefix(authorization, "Bearer ")
+
+	userID, err := t.s.GetUserID(ctx, accessToken)
+	if err != nil {
+		t.log.Error("failed to get user id", zap.Error(err))
+		return
+	}
+
+	expID, err := t.s.Evaluate(ctx, exp.Expression, userID)
 	if err != nil {
 		t.log.Error(err.Error())
 
@@ -135,7 +149,7 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 	}
 
 	data, err := json.Marshal(map[string]any{
-		"id": id,
+		"id": expID,
 	})
 	if err != nil {
 		t.log.Error(err.Error())

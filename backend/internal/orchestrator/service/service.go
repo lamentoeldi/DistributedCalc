@@ -72,7 +72,7 @@ func NewService(expRepo ExpRepo, taskRepo TaskRepo, userRepo UserRepo, auth *aut
 	}
 }
 
-func (s *Service) Evaluate(ctx context.Context, expression string) (string, error) {
+func (s *Service) Evaluate(ctx context.Context, expression, userID string) (string, error) {
 	err := validate(expression)
 	if err != nil {
 		return "", err
@@ -82,6 +82,7 @@ func (s *Service) Evaluate(ctx context.Context, expression string) (string, erro
 
 	exp := &models.Expression{
 		Id:     expID.String(),
+		UserID: userID,
 		Status: StatusPending,
 		Result: 0,
 	}
