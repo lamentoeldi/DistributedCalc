@@ -9,7 +9,10 @@ import (
 
 type Blacklist struct {
 	client redis.UniversalClient
-	ttl    time.Duration
+}
+
+func NewBlacklist(client redis.UniversalClient) *Blacklist {
+	return &Blacklist{client: client}
 }
 
 func (bl *Blacklist) Add(ctx context.Context, tokenID string, ttl time.Duration) error {
