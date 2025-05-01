@@ -32,7 +32,7 @@ const (
 type ExpRepo interface {
 	Add(ctx context.Context, exp *models.Expression) error
 	Get(ctx context.Context, id, userID string) (*models.Expression, error)
-	GetAll(ctx context.Context, userID, cursor string) ([]*models.Expression, error)
+	GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error)
 	Update(ctx context.Context, exp *models.Expression) error
 }
 
@@ -106,8 +106,8 @@ func (s *Service) Get(ctx context.Context, id, userID string) (*models.Expressio
 	return s.expRepo.Get(ctx, id, userID)
 }
 
-func (s *Service) GetAll(ctx context.Context, userID, cursor string) ([]*models.Expression, error) {
-	return s.expRepo.GetAll(ctx, userID, cursor)
+func (s *Service) GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error) {
+	return s.expRepo.GetAll(ctx, userID, cursor, limit)
 }
 
 func (s *Service) GetTask(ctx context.Context) (*models.AgentTask, error) {

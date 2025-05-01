@@ -46,7 +46,7 @@ func (rm *RepositoryMemory) Get(_ context.Context, id, userID string) (*models.E
 	return val, nil
 }
 
-func (rm *RepositoryMemory) GetAll(_ context.Context, userID, cursor string) ([]*models.Expression, error) {
+func (rm *RepositoryMemory) GetAll(_ context.Context, _, _ string, _ int64) ([]*models.Expression, error) {
 	expressions := make([]*models.Expression, 0)
 
 	rm.expMu.RLock()
@@ -76,7 +76,6 @@ func (rm *RepositoryMemory) GetTask(_ context.Context) (*models.Task, error) {
 	defer rm.taskMu.RUnlock()
 	for _, task := range rm.taskM {
 		if task.Status == "ready" {
-			delete(rm.taskM, task.ID)
 			return task, nil
 		}
 	}

@@ -11,19 +11,21 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	methodNotAllowed = "method not allowed"
-	requestTimeout   = 5 * time.Second
+	methodNotAllowed       = "method not allowed"
+	requestTimeout         = 5 * time.Second
+	defaultLimit     int64 = 10
 )
 
 type Service interface {
 	Evaluate(ctx context.Context, expression, userID string) (string, error)
 	Get(ctx context.Context, id, userID string) (*models.Expression, error)
-	GetAll(ctx context.Context, userID, cursor string) ([]*models.Expression, error)
+	GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error)
 
 	GetTask(ctx context.Context) (*models.AgentTask, error)
 	FinishTask(ctx context.Context, result *models.TaskResult) error
@@ -185,8 +187,15 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 	}
 
 	cursor := r.URL.Query().Get("cursor")
+	limitQuery := r.URL.Query().Get("limit")
 
-	exp, err := t.s.GetAll(ctx, userID, cursor)
+	var limit int64
+	limit, err = strconv.ParseInt(limitQuery, 10, 64)
+	if err != nil {
+		limit = defaultLimit
+	}
+
+	exp, err := t.s.GetAll(ctx, userID, cursor, limit)
 	if err != nil {
 		t.log.Error(err.Error())
 

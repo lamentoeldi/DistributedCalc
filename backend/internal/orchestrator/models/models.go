@@ -4,8 +4,8 @@ type Task struct {
 	ID       string  `bson:"_id"`
 	ExpID    string  `bson:"exp_id"`
 	Op       string  `bson:"op"`
-	LeftID   *string `bson:"left_id"`
-	RightID  *string `bson:"right_id"`
+	LeftID   *string `bson:"left_id,omitempty"`
+	RightID  *string `bson:"right_id,omitempty"`
 	LeftArg  float64 `bson:"left_arg"`
 	RightArg float64 `bson:"right_arg"`
 	Result   float64 `bson:"result"`
