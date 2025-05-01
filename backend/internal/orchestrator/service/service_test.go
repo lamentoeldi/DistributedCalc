@@ -176,7 +176,7 @@ func TestService_Evaluate(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := s.Evaluate(context.Background(), tc.expression)
+			_, err := s.Evaluate(context.Background(), tc.expression, "")
 			if tc.wantErr == false && err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
