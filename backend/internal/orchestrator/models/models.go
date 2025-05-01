@@ -30,9 +30,9 @@ type AgentTask struct {
 }
 
 type Expression struct {
-	Id     string  `json:"id"`
-	Result float64 `json:"result"`
-	Status string  `json:"status"`
+	Id     string  `json:"id" bson:"_id"`
+	Result float64 `json:"result" bson:"result"`
+	Status string  `json:"status" bson:"status"`
 }
 
 type CalculateRequest struct {

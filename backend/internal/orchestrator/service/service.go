@@ -31,8 +31,8 @@ const (
 
 type ExpRepo interface {
 	Add(ctx context.Context, exp *models.Expression) error
-	Get(ctx context.Context, id string) (*models.Expression, error)
-	GetAll(ctx context.Context) ([]*models.Expression, error)
+	Get(ctx context.Context, id, userID string) (*models.Expression, error)
+	GetAll(ctx context.Context, userID, cursor string) ([]*models.Expression, error)
 	Update(ctx context.Context, exp *models.Expression) error
 }
 
@@ -101,12 +101,12 @@ func (s *Service) Evaluate(ctx context.Context, expression string) (string, erro
 	return expID.String(), nil
 }
 
-func (s *Service) Get(ctx context.Context, id string) (*models.Expression, error) {
-	return s.expRepo.Get(ctx, id)
+func (s *Service) Get(ctx context.Context, id, userID string) (*models.Expression, error) {
+	return s.expRepo.Get(ctx, id, userID)
 }
 
-func (s *Service) GetAll(ctx context.Context) ([]*models.Expression, error) {
-	return s.expRepo.GetAll(ctx)
+func (s *Service) GetAll(ctx context.Context, userID, cursor string) ([]*models.Expression, error) {
+	return s.expRepo.GetAll(ctx, userID, cursor)
 }
 
 func (s *Service) GetTask(ctx context.Context) (*models.AgentTask, error) {
@@ -426,4 +426,13 @@ func (s *Service) RefreshTokens(ctx context.Context, token string) (string, stri
 	}
 
 	return access, refresh, nil
+}
+
+func (s *Service) GetUserID(_ context.Context, token string) (string, error) {
+	claims, err := s.auth.VerifyAndExtract(token)
+	if err != nil {
+		return "", fmt.Errorf("failed to verify jwt token: %w", err)
+	}
+
+	return claims.GetSubject()
 }

@@ -22,14 +22,15 @@ const (
 
 type Service interface {
 	Evaluate(ctx context.Context, expression string) (string, error)
-	Get(ctx context.Context, id string) (*models.Expression, error)
-	GetAll(ctx context.Context) ([]*models.Expression, error)
+	Get(ctx context.Context, id, userID string) (*models.Expression, error)
+	GetAll(ctx context.Context, userID, cursor string) ([]*models.Expression, error)
 
 	GetTask(ctx context.Context) (*models.AgentTask, error)
 	FinishTask(ctx context.Context, result *models.TaskResult) error
 
 	Register(ctx context.Context, creds *models.UserCredentials) error
 	Login(ctx context.Context, creds *models.UserCredentials) (*models.JWTTokens, error)
+	GetUserID(_ context.Context, token string) (string, error)
 
 	middleware.Auth
 }
@@ -152,9 +153,26 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 
 	if r.Method != http.MethodGet {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+		return
 	}
 
-	exp, err := t.s.GetAll(ctx)
+	authorization := r.Header.Get("Authorization")
+	if len(authorization) < len("Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken := strings.TrimPrefix(authorization, "Bearer ")
+
+	userID, err := t.s.GetUserID(ctx, accessToken)
+	if err != nil {
+		t.log.Error("failed to get user id", zap.Error(err))
+		return
+	}
+
+	cursor := r.URL.Query().Get("cursor")
+
+	exp, err := t.s.GetAll(ctx, userID, cursor)
 	if err != nil {
 		t.log.Error(err.Error())
 
@@ -204,7 +222,21 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	exp, err := t.s.Get(ctx, id.String())
+	authorization := r.Header.Get("Authorization")
+	if len(authorization) < len("Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken := strings.TrimPrefix(authorization, "Bearer ")
+
+	userID, err := t.s.GetUserID(ctx, accessToken)
+	if err != nil {
+		t.log.Error("failed to get user id", zap.Error(err))
+		return
+	}
+
+	exp, err := t.s.Get(ctx, id.String(), userID)
 	if err != nil {
 		t.log.Error(err.Error(), zap.String("exp_id", id.String()))
 
