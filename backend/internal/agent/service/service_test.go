@@ -1,7 +1,8 @@
 package service
 
 import (
-	"github.com/distributed-calc/v1/pkg/models"
+	"fmt"
+	"github.com/distributed-calc/v1/internal/agent/models"
 	"testing"
 )
 
@@ -15,77 +16,77 @@ func TestNewService(t *testing.T) {
 func TestService_Evaluate(t *testing.T) {
 	cases := []struct {
 		name     string
-		task     *models.Task
+		task     *models.AgentTask
 		expected *models.TaskResult
 		wantErr  bool
 	}{
 		{
 			name: "addition",
-			task: &models.Task{
-				Id:            1,
-				Operation:     "+",
-				Arg1:          2,
-				Arg2:          3,
+			task: &models.AgentTask{
+				Id:            fmt.Sprint(1),
+				Op:            "+",
+				LeftArg:       2,
+				RightArg:      3,
 				OperationTime: 100,
 			},
 			expected: &models.TaskResult{
-				Id:     1,
+				Id:     fmt.Sprint(1),
 				Result: 5,
 			},
 			wantErr: false,
 		},
 		{
 			name: "subtraction",
-			task: &models.Task{
-				Id:            2,
-				Operation:     "-",
-				Arg1:          5,
-				Arg2:          3,
+			task: &models.AgentTask{
+				Id:            fmt.Sprint(2),
+				Op:            "-",
+				LeftArg:       5,
+				RightArg:      3,
 				OperationTime: 200,
 			},
 			expected: &models.TaskResult{
-				Id:     2,
+				Id:     fmt.Sprint(2),
 				Result: 2,
 			},
 			wantErr: false,
 		},
 		{
 			name: "multiplication",
-			task: &models.Task{
-				Id:            3,
-				Operation:     "*",
-				Arg1:          2,
-				Arg2:          3,
+			task: &models.AgentTask{
+				Id:            fmt.Sprint(3),
+				Op:            "*",
+				LeftArg:       2,
+				RightArg:      3,
 				OperationTime: 300,
 			},
 			expected: &models.TaskResult{
-				Id:     3,
+				Id:     fmt.Sprint(3),
 				Result: 6,
 			},
 			wantErr: false,
 		},
 		{
 			name: "division",
-			task: &models.Task{
-				Id:            4,
-				Operation:     "/",
-				Arg1:          10,
-				Arg2:          2,
+			task: &models.AgentTask{
+				Id:            fmt.Sprint(4),
+				Op:            "/",
+				LeftArg:       10,
+				RightArg:      2,
 				OperationTime: 400,
 			},
 			expected: &models.TaskResult{
-				Id:     4,
+				Id:     fmt.Sprint(4),
 				Result: 5,
 			},
 			wantErr: false,
 		},
 		{
 			name: "division by zero",
-			task: &models.Task{
-				Id:            5,
-				Operation:     "/",
-				Arg1:          5,
-				Arg2:          0,
+			task: &models.AgentTask{
+				Id:            fmt.Sprint(5),
+				Op:            "/",
+				LeftArg:       5,
+				RightArg:      0,
 				OperationTime: 500,
 			},
 			wantErr: true,

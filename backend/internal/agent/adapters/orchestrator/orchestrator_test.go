@@ -3,19 +3,21 @@ package orchestrator
 import (
 	"context"
 	"encoding/json"
-	"github.com/distributed-calc/v1/pkg/models"
-	"math/rand"
+	"github.com/distributed-calc/v1/internal/agent/models"
+	"github.com/google/uuid"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 func handleGetTask(w http.ResponseWriter, _ *http.Request) {
-	task := &models.Task{
-		Id:            rand.Int(),
-		Arg1:          3.14,
-		Arg2:          2,
-		Operation:     "+",
+	id, _ := uuid.NewV7()
+
+	task := &models.AgentTask{
+		Id:            id.String(),
+		LeftArg:       3.14,
+		RightArg:      2,
+		Op:            "+",
 		OperationTime: 10,
 	}
 
@@ -65,9 +67,11 @@ func TestOrchestrator_PostResult(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(handlePostResult))
 	defer ts.Close()
 
+	id, _ := uuid.NewV7()
+
 	o := NewOrchestrator(&http.Client{}, ts.URL, 3)
 	result := &models.TaskResult{
-		Id:     90131329,
+		Id:     id.String(),
 		Result: 5,
 	}
 

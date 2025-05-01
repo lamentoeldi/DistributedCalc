@@ -2,20 +2,13 @@ package service
 
 import (
 	"context"
-	"fmt"
-	"github.com/distributed-calc/v1/internal/orchestrator/adapters/queue"
-	"github.com/distributed-calc/v1/internal/orchestrator/config"
+	"github.com/distributed-calc/v1/internal/orchestrator/models"
 	"github.com/distributed-calc/v1/internal/orchestrator/repository/memory"
-	"github.com/distributed-calc/v1/pkg/models"
 	"github.com/google/uuid"
-	"log"
 	"testing"
-	"time"
 )
 
-func TestService_tokenize(t *testing.T) {
-	s := NewService(nil, nil, nil)
-
+func TestValidate(t *testing.T) {
 	cases := []struct {
 		name    string
 		exp     string
@@ -95,8 +88,7 @@ func TestService_tokenize(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokens, err := s.tokenize(tc.exp)
-			fmt.Println("tokens: ", tokens)
+			err := validate(tc.exp)
 			if tc.wantErr == false && err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
@@ -107,9 +99,7 @@ func TestService_tokenize(t *testing.T) {
 	}
 }
 
-func TestService_buildAST(t *testing.T) {
-	s := NewService(nil, nil, nil)
-
+func TestParseExpression(t *testing.T) {
 	cases := []struct {
 		name       string
 		expression string
@@ -150,13 +140,7 @@ func TestService_buildAST(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokens, err := s.tokenize(tc.expression)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			ast, err := s.buildAST(tokens)
-			fmt.Println(*ast)
+			_, err := parseExpression(tc.expression, tc.name)
 			if tc.wantErr == false && err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
@@ -168,162 +152,9 @@ func TestService_buildAST(t *testing.T) {
 	}
 }
 
-func TestService_evaluateAST(t *testing.T) {
-	cfg := &config.Config{
-		Host: "",
-		Port: 0,
-
-		AdditionTime:       100 * time.Millisecond,
-		SubtractionTime:    500 * time.Millisecond,
-		MultiplicationTime: 2000 * time.Millisecond,
-		DivisionTime:       1000 * time.Millisecond,
-	}
-
-	r := memory.NewRepositoryMemory()
-	q := queue.NewQueueChan[models.Task](64)
-	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p, q)
-
-	cases := []struct {
-		name       string
-		expression string
-		expected   float64
-		wantErr    bool
-	}{
-		{
-			name:       "simple expression",
-			expression: "2+2",
-			expected:   4,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with parenthesis",
-			expression: "(2+2)*3",
-			expected:   12,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with operator priority",
-			expression: "2*2+3",
-			expected:   7,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with float numbers",
-			expression: "3.14+2",
-			expected:   5.14,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with nested parenthesis",
-			expression: "((2+3)*2)+1",
-			expected:   11,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with paralleled tasks",
-			expression: "(2+3)*(4+1)",
-			expected:   25,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with more paralleled tasks",
-			expression: "(2+3)*(4+1)+(5+1)*(5+5)",
-			expected:   85,
-			wantErr:    false,
-		},
-		{
-			name:       "negative unary expression",
-			expression: "-2",
-			expected:   -2,
-			wantErr:    false,
-		},
-		{
-			name:       "positive unary expression",
-			expression: "2",
-			expected:   2,
-			wantErr:    false,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			// This is agent implementation for tests
-			go func() {
-				for {
-					task, err := q.Dequeue(context.Background())
-					if err != nil {
-						continue
-					}
-
-					time.Sleep(time.Duration(task.OperationTime) * time.Millisecond)
-
-					res := &models.TaskResult{
-						Id: task.Id,
-					}
-					switch task.Operation {
-					case "+":
-						res.Result = task.Arg1 + task.Arg2
-					case "-":
-						res.Result = task.Arg1 - task.Arg2
-					case "*":
-						res.Result = task.Arg1 * task.Arg2
-					case "/":
-						res.Result = task.Arg1 / task.Arg2
-					}
-
-					err = s.p.FinishTask(context.TODO(), res)
-					if err != nil {
-						log.Printf("Error finishing task %d: %v", task.Id, err)
-						continue
-					}
-				}
-			}()
-
-			tokens, err := s.tokenize(tc.expression)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			ast, err := s.buildAST(tokens)
-			if tc.wantErr == false && err != nil {
-				t.Errorf("expected no error, got %v", err)
-			}
-
-			res, err := s.evaluateAST(ast)
-			if tc.wantErr == false && err != nil {
-				t.Errorf("expected no error, got %v", err)
-			}
-
-			if tc.wantErr == true && err == nil {
-				t.Error("expected error, got none")
-			}
-
-			if int(tc.expected*1000) != int(res*1000) {
-				t.Errorf("expected %f, got %f", tc.expected, res)
-			}
-
-			log.Printf("calculated value: %.2f for %s", res, tc.name)
-		})
-	}
-}
-
-func TestService_StartEvaluation(t *testing.T) {
-	cfg := &config.Config{
-		Host: "",
-		Port: 0,
-
-		AdditionTime:       100 * time.Millisecond,
-		SubtractionTime:    500 * time.Millisecond,
-		MultiplicationTime: 2000 * time.Millisecond,
-		DivisionTime:       1000 * time.Millisecond,
-	}
-
-	r := memory.NewRepositoryMemory()
-	q := queue.NewQueueChan[models.Task](64)
-	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p, q)
+func TestService_Evaluate(t *testing.T) {
+	repo := memory.NewRepositoryMemory()
+	s := NewService(repo, repo)
 
 	cases := []struct {
 		name       string
@@ -345,7 +176,7 @@ func TestService_StartEvaluation(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := s.StartEvaluation(context.Background(), tc.expression)
+			_, err := s.Evaluate(context.Background(), tc.expression)
 			if tc.wantErr == false && err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
@@ -358,20 +189,8 @@ func TestService_StartEvaluation(t *testing.T) {
 }
 
 func TestService_Get(t *testing.T) {
-	cfg := &config.Config{
-		Host: "",
-		Port: 0,
-
-		AdditionTime:       100 * time.Millisecond,
-		SubtractionTime:    500 * time.Millisecond,
-		MultiplicationTime: 2000 * time.Millisecond,
-		DivisionTime:       1000 * time.Millisecond,
-	}
-
-	r := memory.NewRepositoryMemory()
-	q := queue.NewQueueChan[models.Task](64)
-	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p, q)
+	repo := memory.NewRepositoryMemory()
+	s := NewService(repo, repo)
 
 	found := uuid.NewString()
 
@@ -392,7 +211,7 @@ func TestService_Get(t *testing.T) {
 		},
 	}
 
-	err := s.r.Add(context.Background(), &models.Expression{
+	err := s.expRepo.Add(context.Background(), &models.Expression{
 		Id:     found,
 		Status: "testing",
 		Result: 0,
@@ -416,20 +235,8 @@ func TestService_Get(t *testing.T) {
 }
 
 func TestService_GetAll(t *testing.T) {
-	cfg := &config.Config{
-		Host: "",
-		Port: 0,
-
-		AdditionTime:       100 * time.Millisecond,
-		SubtractionTime:    500 * time.Millisecond,
-		MultiplicationTime: 2000 * time.Millisecond,
-		DivisionTime:       1000 * time.Millisecond,
-	}
-
-	r := memory.NewRepositoryMemory()
-	q := queue.NewQueueChan[models.Task](64)
-	p := NewPlannerChan(cfg, q)
-	s := NewService(r, p, q)
+	repo := memory.NewRepositoryMemory()
+	s := NewService(repo, repo)
 
 	exp := &models.Expression{
 		Id:     uuid.NewString(),
@@ -437,7 +244,7 @@ func TestService_GetAll(t *testing.T) {
 		Result: 0,
 	}
 
-	err := s.r.Add(context.Background(), exp)
+	err := s.expRepo.Add(context.Background(), exp)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -445,110 +252,5 @@ func TestService_GetAll(t *testing.T) {
 	_, err = s.GetAll(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestTaskAST(t *testing.T) {
-	cases := []struct {
-		name       string
-		expression string
-		expected   float64
-		wantErr    bool
-	}{
-		{
-			name:       "simple expression",
-			expression: "2+2",
-			expected:   4,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with parenthesis",
-			expression: "(2+2)*3",
-			expected:   12,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with operator priority",
-			expression: "2*2+3",
-			expected:   7,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with float numbers",
-			expression: "3.14+2",
-			expected:   5.14,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with nested parenthesis",
-			expression: "((2+3)*2)+1",
-			expected:   11,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with paralleled tasks",
-			expression: "(2+3)*(4+1)",
-			expected:   25,
-			wantErr:    false,
-		},
-		{
-			name:       "expression with more paralleled tasks",
-			expression: "(2+3)*(4+1)+(5+1)*(5+5)",
-			expected:   85,
-			wantErr:    false,
-		},
-		{
-			name:       "negative unary expression",
-			expression: "-2",
-			expected:   -2,
-			wantErr:    false,
-		},
-		{
-			name:       "positive unary expression",
-			expression: "2",
-			expected:   2,
-			wantErr:    false,
-		},
-	}
-
-	s := NewService(nil, nil, nil)
-
-	for _, tc := range cases {
-		tokens, err := s.tokenize(tc.expression)
-		if err != nil {
-			t.Error(err)
-		}
-
-		ast, err := s.buildAST(tokens)
-		if err != nil {
-			t.Error(err)
-		}
-
-		tasks, err := s.taskAST(ast)
-		if err != nil {
-			t.Error(err)
-		}
-
-		_ = ast
-		if err != nil {
-			t.Error("failed to build AST")
-		}
-
-		for _, ta := range tasks {
-			toPrint := fmt.Sprintf("%s %s %s %s %v", ta.id, ta.leftID, ta.rightID, ta.operator, ta.topLevel)
-			if ta.arg1 != nil {
-				toPrint += fmt.Sprintf(" %.2f", *ta.arg1)
-			}
-
-			if ta.arg2 != nil {
-				toPrint += fmt.Sprintf(" %.2f", *ta.arg2)
-			}
-
-			if ta.result != nil {
-				toPrint += fmt.Sprintf(" %.2f", *ta.result)
-			}
-
-			fmt.Println(toPrint)
-		}
 	}
 }

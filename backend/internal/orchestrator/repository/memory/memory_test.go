@@ -2,7 +2,7 @@ package memory
 
 import (
 	"context"
-	"github.com/distributed-calc/v1/pkg/models"
+	"github.com/distributed-calc/v1/internal/orchestrator/models"
 	"github.com/google/uuid"
 	"log"
 	"testing"
