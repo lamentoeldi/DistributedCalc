@@ -4,25 +4,26 @@ import (
 	"context"
 	"errors"
 	"github.com/distributed-calc/v1/internal/agent/config"
-	"github.com/distributed-calc/v1/pkg/models"
+	e "github.com/distributed-calc/v1/internal/agent/errors"
+	"github.com/distributed-calc/v1/internal/agent/models"
 	"go.uber.org/zap"
 	"sync"
 	"time"
 )
 
 type Orchestrator interface {
-	GetTask(ctx context.Context) (*models.Task, error)
+	GetTask(ctx context.Context) (*models.AgentTask, error)
 	PostResult(ctx context.Context, result *models.TaskResult) error
 }
 
 type Calculator interface {
-	Evaluate(task *models.Task) (*models.TaskResult, error)
+	Evaluate(task *models.AgentTask) (*models.TaskResult, error)
 }
 
 type TransportAsync struct {
 	o        Orchestrator
 	c        Calculator
-	in       chan *models.Task
+	in       chan *models.AgentTask
 	out      chan *models.TaskResult
 	cfg      *config.Config
 	log      *zap.Logger
@@ -33,7 +34,7 @@ type TransportAsync struct {
 func NewTransportAsync(cfg *config.Config, log *zap.Logger, o Orchestrator, c Calculator) *TransportAsync {
 	return &TransportAsync{
 		o:   o,
-		in:  make(chan *models.Task, cfg.BufferSize),
+		in:  make(chan *models.AgentTask, cfg.BufferSize),
 		out: make(chan *models.TaskResult, cfg.BufferSize),
 		c:   c,
 		log: log,
@@ -101,7 +102,7 @@ func (t *TransportAsync) consume(ctx context.Context) {
 			task, err := t.o.GetTask(ctx)
 			if err != nil {
 				switch {
-				case errors.Is(err, models.ErrNoTasks):
+				case errors.Is(err, e.ErrNoTasks):
 				default:
 					t.log.Error(err.Error())
 				}
