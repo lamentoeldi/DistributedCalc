@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/distributed-calc/v1/internal/orchestrator/errors"
-	errors2 "github.com/distributed-calc/v1/internal/orchestrator/errors"
+	e "github.com/distributed-calc/v1/internal/orchestrator/errors"
 	"github.com/distributed-calc/v1/internal/orchestrator/models"
-	models2 "github.com/distributed-calc/v1/internal/orchestrator/models"
 	"github.com/distributed-calc/v1/pkg/authenticator"
 	"github.com/distributed-calc/v1/pkg/middleware"
 	"github.com/golang-jwt/jwt/v5"
@@ -37,8 +36,8 @@ type ExpRepo interface {
 }
 
 type UserRepo interface {
-	AddUser(ctx context.Context, user *models2.User) error
-	GetUser(ctx context.Context, login string) (*models2.User, error)
+	AddUser(ctx context.Context, user *models.User) error
+	GetUser(ctx context.Context, login string) (*models.User, error)
 }
 
 type TaskRepo interface {
@@ -57,16 +56,18 @@ type BlackList interface {
 type Service struct {
 	expRepo  ExpRepo
 	taskRepo TaskRepo
-	bl   BlackList
-	auth *authenticator.Authenticator
+	userRepo UserRepo
+	bl       BlackList
+	auth     *authenticator.Authenticator
 }
 
-func NewService(expRepo ExpRepo, taskRepo TaskRepo, auth *authenticator.Authenticator, bl BlackList) *Service {
+func NewService(expRepo ExpRepo, taskRepo TaskRepo, userRepo UserRepo, auth *authenticator.Authenticator, bl BlackList) *Service {
 	return &Service{
 		expRepo:  expRepo,
 		taskRepo: taskRepo,
-		auth: auth,
-		bl:   bl,
+		userRepo: userRepo,
+		auth:     auth,
+		bl:       bl,
 	}
 }
 
@@ -328,7 +329,7 @@ func parseExpression(exprStr, expID string) ([]*models.Task, error) {
 	return tasks, nil
 }
 
-func (s *Service) Register(ctx context.Context, creds *models2.UserCredentials) error {
+func (s *Service) Register(ctx context.Context, creds *models.UserCredentials) error {
 	id, _ := uuid.NewV7()
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(creds.Password), bcrypt.DefaultCost)
@@ -336,13 +337,13 @@ func (s *Service) Register(ctx context.Context, creds *models2.UserCredentials) 
 		return fmt.Errorf("failed to register user: %w", err)
 	}
 
-	user := &models2.User{
+	user := &models.User{
 		Id:             id.String(),
 		Username:       creds.Username,
 		HashedPassword: hash,
 	}
 
-	err = s.repo.AddUser(ctx, user)
+	err = s.userRepo.AddUser(ctx, user)
 	if err != nil {
 		return fmt.Errorf("failed to register user: %w", err)
 	}
@@ -350,15 +351,15 @@ func (s *Service) Register(ctx context.Context, creds *models2.UserCredentials) 
 	return nil
 }
 
-func (s *Service) Login(ctx context.Context, creds *models2.UserCredentials) (*models2.JWTTokens, error) {
-	user, err := s.repo.GetUser(ctx, creds.Username)
+func (s *Service) Login(ctx context.Context, creds *models.UserCredentials) (*models.JWTTokens, error) {
+	user, err := s.userRepo.GetUser(ctx, creds.Username)
 	if err != nil {
-		return nil, fmt.Errorf("failed to authorize user: %w: %w", errors2.ErrUnauthorized, err)
+		return nil, fmt.Errorf("failed to authorize user: %w: %w", e.ErrUnauthorized, err)
 	}
 
 	err = bcrypt.CompareHashAndPassword(user.HashedPassword, []byte(creds.Password))
 	if err != nil {
-		return nil, fmt.Errorf("failed to authorize user: %w: %w", errors2.ErrUnauthorized, err)
+		return nil, fmt.Errorf("failed to authorize user: %w: %w", e.ErrUnauthorized, err)
 	}
 
 	access, refresh, err := s.auth.SignTokens(s.auth.IssueTokens(user.Id))
@@ -366,7 +367,7 @@ func (s *Service) Login(ctx context.Context, creds *models2.UserCredentials) (*m
 		return nil, fmt.Errorf("failed to issue tokens: %w", err)
 	}
 
-	return &models2.JWTTokens{
+	return &models.JWTTokens{
 		AccessToken:  access,
 		RefreshToken: refresh,
 	}, nil

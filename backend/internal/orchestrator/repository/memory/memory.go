@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	models2 "github.com/distributed-calc/v1/internal/orchestrator/models"
 	"fmt"
 	"github.com/distributed-calc/v1/internal/orchestrator/errors"
 	"github.com/distributed-calc/v1/internal/orchestrator/models"
@@ -16,15 +15,15 @@ type RepositoryMemory struct {
 	taskM  map[string]*models.Task
 	taskMu sync.RWMutex
 
-	usersM   map[string]*models2.User
+	usersM  map[string]*models.User
 	usersMu sync.RWMutex
 }
 
 func NewRepositoryMemory() *RepositoryMemory {
 	return &RepositoryMemory{
-		expM:  make(map[string]*models.Expression),
-		taskM: make(map[string]*models.Task),
-		usersM: make(map[string]*models2.User),
+		expM:   make(map[string]*models.Expression),
+		taskM:  make(map[string]*models.Task),
+		usersM: make(map[string]*models.User),
 	}
 }
 
@@ -133,20 +132,20 @@ func (rm *RepositoryMemory) Update(_ context.Context, exp *models.Expression) er
 	return nil
 }
 
-func (r *RepositoryMemory) AddUser(_ context.Context, user *models2.User) error {
+func (r *RepositoryMemory) AddUser(_ context.Context, user *models.User) error {
 	r.usersMu.Lock()
 	defer r.usersMu.Unlock()
 
-	r.users[user.Username] = user
+	r.usersM[user.Username] = user
 	return nil
 }
 
-func (r *RepositoryMemory) GetUser(_ context.Context, login string) (*models2.User, error) {
+func (r *RepositoryMemory) GetUser(_ context.Context, login string) (*models.User, error) {
 	r.usersMu.RLock()
-	user, ok := r.users[login]
+	user, ok := r.usersM[login]
 	r.usersMu.RUnlock()
 	if !ok {
-		return nil, models.ErrExpressionDoesNotExist
+		return nil, errors.ErrExpressionDoesNotExist
 	}
 
 	return user, nil

@@ -22,7 +22,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewProduction()
 
 	cfg, err := config.NewConfig()
 	if err != nil {
@@ -42,12 +42,11 @@ func main() {
 	accessTTL := 10 * time.Minute
 	refreshTTL := 7 * 24 * time.Hour
 
-	rep := memory.NewRepositoryMemory()
-	app := service.NewService(rep, rep)
-	bl := memory2.NewBlacklist()
-	planner := service.NewPlannerChan(cfg, q)
+	repo := memory.NewRepositoryMemory()
 	auth := authenticator.NewAuthenticator(accessPk, refreshPk, accessTTL, refreshTTL)
-	app := service.NewService(rep, planner, q, auth, bl)
+	bl := memory2.NewBlacklist()
+
+	app := service.NewService(repo, repo, repo, auth, bl)
 
 	transportCfg := &http.TransportHttpConfig{
 		Host: cfg.Host,

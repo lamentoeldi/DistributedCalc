@@ -24,9 +24,12 @@ type Service interface {
 	Evaluate(ctx context.Context, expression string) (string, error)
 	Get(ctx context.Context, id string) (*models.Expression, error)
 	GetAll(ctx context.Context) ([]*models.Expression, error)
+
+	GetTask(ctx context.Context) (*models.AgentTask, error)
 	FinishTask(ctx context.Context, result *models.TaskResult) error
-	Register(ctx context.Context, creds *models2.UserCredentials) error
-	Login(ctx context.Context, creds *models2.UserCredentials) (*models2.JWTTokens, error)
+
+	Register(ctx context.Context, creds *models.UserCredentials) error
+	Login(ctx context.Context, creds *models.UserCredentials) (*models.JWTTokens, error)
 
 	middleware.Auth
 }
@@ -65,13 +68,13 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *Tra
 			"/api/v1/expressions",
 			middleware.MwLogger(log,
 				middleware.MwRecover(log,
-					middleware.MwAuth(log, s, http.HandlerFunc(t.handleCalculate)))))
+					middleware.MwAuth(log, s, http.HandlerFunc(t.handleExpressions)))))
 	t.mux.
 		Handle(
 			"/api/v1/expressions/",
 			middleware.MwLogger(log,
 				middleware.MwRecover(log,
-					middleware.MwAuth(log, s, http.HandlerFunc(t.handleCalculate)))))
+					middleware.MwAuth(log, s, http.HandlerFunc(t.handleExpression)))))
 
 	t.mux.
 		Handle(
@@ -81,6 +84,11 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *Tra
 		Handle(
 			"/api/v1/login",
 			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleLogin))))
+
+	t.mux.
+		Handle(
+			"/internal/task",
+			middleware.MwRecover(log, http.HandlerFunc(t.handleTask)))
 
 	return t
 }
@@ -111,7 +119,7 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id, err := t.s.Evaluate(r.Context(), exp.Expression)
+	id, err := t.s.Evaluate(ctx, exp.Expression)
 	if err != nil {
 		t.log.Error(err.Error())
 
@@ -217,40 +225,6 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 	_, _ = w.Write(data)
 }
 
-func (t *TransportHttp) handleRegister(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
-	defer cancel()
-
-	if r.Method != http.MethodPost {
-		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
-		return
-	}
-
-	defer r.Body.Close()
-
-	var creds models2.UserCredentials
-	err := json.NewDecoder(r.Body).Decode(&creds)
-	if err != nil {
-		t.log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	err = t.s.Register(ctx, &creds)
-	if err != nil {
-		t.log.Error(err.Error())
-
-		switch {
-		case errors.Is(err, errors2.ErrBadRequest):
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		case errors.Is(err, errors2.ErrConflict):
-			http.Error(w, err.Error(), http.StatusConflict)
-		default:
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
-}
-
 func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
@@ -330,7 +304,7 @@ func (t *TransportHttp) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	var creds models2.UserCredentials
+	var creds models.UserCredentials
 	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		t.log.Error(err.Error())
@@ -343,9 +317,9 @@ func (t *TransportHttp) handleRegister(w http.ResponseWriter, r *http.Request) {
 		t.log.Error(err.Error())
 
 		switch {
-		case errors.Is(err, errors2.ErrBadRequest):
+		case errors.Is(err, e.ErrBadRequest):
 			http.Error(w, err.Error(), http.StatusBadRequest)
-		case errors.Is(err, errors2.ErrConflict):
+		case errors.Is(err, e.ErrConflict):
 			http.Error(w, err.Error(), http.StatusConflict)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -364,7 +338,7 @@ func (t *TransportHttp) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	var creds models2.UserCredentials
+	var creds models.UserCredentials
 	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		t.log.Error(err.Error())
@@ -377,7 +351,7 @@ func (t *TransportHttp) handleLogin(w http.ResponseWriter, r *http.Request) {
 		t.log.Error(err.Error())
 
 		switch {
-		case errors.Is(err, errors2.ErrUnauthorized):
+		case errors.Is(err, e.ErrUnauthorized):
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
