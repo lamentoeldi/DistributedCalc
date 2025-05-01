@@ -2,45 +2,69 @@ package service
 
 import (
 	"fmt"
-	"github.com/distributed-calc/v1/pkg/models"
+	"github.com/distributed-calc/v1/internal/agent/models"
 	"time"
 )
 
-type Service struct {
-}
+const (
+	statusSuccess = "completed"
+	statusFailure = "failure"
+)
+
+type Service struct{}
 
 func NewService() *Service {
 	return &Service{}
 }
 
-func (s *Service) Evaluate(t *models.Task) (*models.TaskResult, error) {
+func (s *Service) Evaluate(t *models.AgentTask) (*models.TaskResult, error) {
 	time.Sleep(time.Duration(t.OperationTime) * time.Millisecond)
 
-	switch t.Operation {
+	switch t.Op {
 	case "+":
 		return &models.TaskResult{
 			Id:     t.Id,
-			Result: t.Arg1 + t.Arg2,
+			Result: t.LeftArg + t.RightArg,
+			Status: statusSuccess,
+			Final:  t.Final,
 		}, nil
 	case "-":
 		return &models.TaskResult{
 			Id:     t.Id,
-			Result: t.Arg1 - t.Arg2,
+			Result: t.LeftArg - t.RightArg,
+			Status: statusSuccess,
+			Final:  t.Final,
 		}, nil
 	case "*":
 		return &models.TaskResult{
 			Id:     t.Id,
-			Result: t.Arg1 * t.Arg2,
+			Result: t.LeftArg * t.RightArg,
+			Status: statusSuccess,
+			Final:  t.Final,
 		}, nil
 	case "/":
-		if t.Arg2 == 0 {
-			return nil, fmt.Errorf("division by zero")
+		if t.RightArg == 0 {
+			return &models.TaskResult{
+				Id:     t.Id,
+				Status: statusFailure,
+				Final:  t.Final,
+			}, fmt.Errorf("division by zero")
 		}
+
 		return &models.TaskResult{
 			Id:     t.Id,
-			Result: t.Arg1 / t.Arg2,
+			Result: t.LeftArg / t.RightArg,
+			Status: statusSuccess,
+			Final:  t.Final,
+		}, nil
+	case "":
+		return &models.TaskResult{
+			Id:     t.Id,
+			Result: t.LeftArg,
+			Status: statusSuccess,
+			Final:  t.Final,
 		}, nil
 	}
 
-	return nil, fmt.Errorf("unknown operation %s", t.Operation)
+	return nil, fmt.Errorf("unknown operation %s", t.Op)
 }

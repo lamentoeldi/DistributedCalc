@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/distributed-calc/v1/pkg/models"
+	"github.com/distributed-calc/v1/internal/orchestrator/errors"
 	"github.com/distributed-calc/v1/test/mock"
 	"go.uber.org/zap"
 	"net/http"
@@ -90,7 +90,7 @@ func TestTransportHttp_handleCalculate(t *testing.T) {
 			name:           "unprocessable entity",
 			expression:     `{"expression": "2+("}`,
 			method:         "POST",
-			err:            models.ErrInvalidExpression,
+			err:            errors.ErrInvalidExpression,
 			expectedStatus: http.StatusUnprocessableEntity,
 		},
 		{
@@ -138,7 +138,7 @@ func TestTransportHttp_handleExpressions(t *testing.T) {
 		{
 			name:           "not found",
 			method:         "GET",
-			err:            models.ErrNoExpressions,
+			err:            errors.ErrNoExpressions,
 			expectedStatus: http.StatusNotFound,
 		},
 		{
@@ -185,7 +185,7 @@ func TestTransportHttp_handleExpression(t *testing.T) {
 		{
 			name:           "not found",
 			method:         "GET",
-			err:            models.ErrExpressionDoesNotExist,
+			err:            errors.ErrExpressionDoesNotExist,
 			expectedStatus: http.StatusNotFound,
 		},
 		{
@@ -232,7 +232,7 @@ func TestTransportHttp_handleGetTask(t *testing.T) {
 		{
 			name:           "not found",
 			method:         "GET",
-			err:            models.ErrNoTasks,
+			err:            errors.ErrNoTasks,
 			expectedStatus: http.StatusNotFound,
 		},
 	}
@@ -277,14 +277,14 @@ func TestTransportHttp_handlePostTask(t *testing.T) {
 			name:           "bad request",
 			method:         "POST",
 			body:           "invalid expression",
-			err:            models.ErrInvalidExpression,
+			err:            errors.ErrInvalidExpression,
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "not found",
 			method:         "POST",
 			body:           `{"expression": "2+2"}`,
-			err:            models.ErrExpressionDoesNotExist,
+			err:            errors.ErrExpressionDoesNotExist,
 			expectedStatus: http.StatusNotFound,
 		},
 	}

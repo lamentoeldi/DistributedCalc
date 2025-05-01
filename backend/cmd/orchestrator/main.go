@@ -5,14 +5,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"github.com/distributed-calc/v1/internal/orchestrator/adapters/queue"
 	memory2 "github.com/distributed-calc/v1/internal/orchestrator/blacklist/memory"
 	"github.com/distributed-calc/v1/internal/orchestrator/config"
 	"github.com/distributed-calc/v1/internal/orchestrator/repository/memory"
 	"github.com/distributed-calc/v1/internal/orchestrator/service"
 	"github.com/distributed-calc/v1/internal/orchestrator/transport/http"
 	"github.com/distributed-calc/v1/pkg/authenticator"
-	"github.com/distributed-calc/v1/pkg/models"
 	"go.uber.org/zap"
 	"os/signal"
 	"syscall"
@@ -28,11 +26,7 @@ func main() {
 
 	cfg, err := config.NewConfig()
 	if err != nil {
-		lg, _ := zap.NewProduction()
-		lg.Fatal(err.Error())
 	}
-
-	q := queue.NewQueueChan[models.Task](64)
 
 	// TODO: read from config
 	accessPk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -49,6 +43,7 @@ func main() {
 	refreshTTL := 7 * 24 * time.Hour
 
 	rep := memory.NewRepositoryMemory()
+	app := service.NewService(rep, rep)
 	bl := memory2.NewBlacklist()
 	planner := service.NewPlannerChan(cfg, q)
 	auth := authenticator.NewAuthenticator(accessPk, refreshPk, accessTTL, refreshTTL)

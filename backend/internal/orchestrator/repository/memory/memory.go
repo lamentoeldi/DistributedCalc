@@ -3,57 +3,134 @@ package memory
 import (
 	"context"
 	models2 "github.com/distributed-calc/v1/internal/orchestrator/models"
-	"github.com/distributed-calc/v1/pkg/models"
+	"fmt"
+	"github.com/distributed-calc/v1/internal/orchestrator/errors"
+	"github.com/distributed-calc/v1/internal/orchestrator/models"
 	"sync"
 )
 
 type RepositoryMemory struct {
-	exp     map[string]*models.Expression
-	expMu   sync.RWMutex
-	users   map[string]*models2.User
+	expM  map[string]*models.Expression
+	expMu sync.RWMutex
+
+	taskM  map[string]*models.Task
+	taskMu sync.RWMutex
+
+	usersM   map[string]*models2.User
 	usersMu sync.RWMutex
 }
 
 func NewRepositoryMemory() *RepositoryMemory {
 	return &RepositoryMemory{
-		exp:   make(map[string]*models.Expression),
-		users: make(map[string]*models2.User),
+		expM:  make(map[string]*models.Expression),
+		taskM: make(map[string]*models.Task),
+		usersM: make(map[string]*models2.User),
 	}
 }
 
-func (r *RepositoryMemory) Add(_ context.Context, exp *models.Expression) error {
-	r.expMu.Lock()
-	defer r.expMu.Unlock()
+func (rm *RepositoryMemory) Add(_ context.Context, exp *models.Expression) error {
+	rm.expMu.Lock()
+	defer rm.expMu.Unlock()
 
-	r.exp[exp.Id] = exp
+	rm.expM[exp.Id] = exp
 	return nil
 }
 
-func (r *RepositoryMemory) Get(_ context.Context, id string) (*models.Expression, error) {
-	r.expMu.RLock()
-	val, ok := r.exp[id]
-	r.expMu.RUnlock()
+func (rm *RepositoryMemory) Get(_ context.Context, id string) (*models.Expression, error) {
+	rm.expMu.RLock()
+	val, ok := rm.expM[id]
+	rm.expMu.RUnlock()
 	if !ok {
-		return nil, models.ErrExpressionDoesNotExist
+		return nil, errors.ErrExpressionDoesNotExist
 	}
 
 	return val, nil
 }
 
-func (r *RepositoryMemory) GetAll(_ context.Context) ([]*models.Expression, error) {
+func (rm *RepositoryMemory) GetAll(_ context.Context) ([]*models.Expression, error) {
 	expressions := make([]*models.Expression, 0)
 
-	r.expMu.RLock()
-	for _, val := range r.exp {
+	rm.expMu.RLock()
+	for _, val := range rm.expM {
 		expressions = append(expressions, val)
 	}
-	r.expMu.RUnlock()
+	rm.expMu.RUnlock()
 
 	if len(expressions) < 1 {
-		return nil, models.ErrNoExpressions
+		return nil, errors.ErrNoExpressions
 	}
 
 	return expressions, nil
+}
+
+func (rm *RepositoryMemory) AddTasks(_ context.Context, tasks []*models.Task) error {
+	rm.taskMu.Lock()
+	defer rm.taskMu.Unlock()
+	for _, t := range tasks {
+		rm.taskM[t.ID] = t
+	}
+	return nil
+}
+
+func (rm *RepositoryMemory) GetTask(_ context.Context) (*models.Task, error) {
+	rm.taskMu.RLock()
+	defer rm.taskMu.RUnlock()
+	for _, task := range rm.taskM {
+		if task.Status == "ready" {
+			delete(rm.taskM, task.ID)
+			return task, nil
+		}
+	}
+	return nil, fmt.Errorf("%w: no ready task found", errors.ErrNoTasks)
+}
+
+func (rm *RepositoryMemory) UpdateTask(_ context.Context, task *models.Task) error {
+	rm.taskMu.Lock()
+	defer rm.taskMu.Unlock()
+	rm.taskM[task.ID] = task
+
+	for id, t := range rm.taskM {
+		if t.LeftID != nil && *t.LeftID == task.ID {
+			t.LeftArg = task.Result
+			t.LeftID = nil
+			if t.LeftID == nil && t.RightID == nil {
+				t.Status = "ready"
+			}
+			rm.taskM[id] = t
+		}
+		if t.RightID != nil && *t.RightID == task.ID {
+			t.RightArg = task.Result
+			t.RightID = nil
+			if t.LeftID == nil && t.RightID == nil {
+				t.Status = "ready"
+			}
+			rm.taskM[id] = t
+		}
+	}
+
+	return nil
+}
+
+func (rm *RepositoryMemory) DeleteTasks(_ context.Context, expID string) error {
+	rm.taskMu.Lock()
+	defer rm.taskMu.Unlock()
+
+	for _, task := range rm.taskM {
+		if task.ExpID == expID {
+			delete(rm.taskM, task.ID)
+		}
+	}
+
+	return nil
+}
+
+func (rm *RepositoryMemory) Update(_ context.Context, exp *models.Expression) error {
+	rm.expMu.Lock()
+	defer rm.expMu.Unlock()
+
+	rm.expM[exp.Id] = exp
+
+	return nil
 }
 
 func (r *RepositoryMemory) AddUser(_ context.Context, user *models2.User) error {
