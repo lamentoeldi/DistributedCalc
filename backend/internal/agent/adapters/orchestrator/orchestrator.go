@@ -5,7 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/distributed-calc/v1/pkg/models"
+	"github.com/distributed-calc/v1/internal/agent/errors"
+	"github.com/distributed-calc/v1/internal/agent/models"
 	"net/http"
 	"time"
 )
@@ -24,7 +25,7 @@ func NewOrchestrator(client *http.Client, url string, retries int) *Orchestrator
 	}
 }
 
-func (o *Orchestrator) GetTask(ctx context.Context) (*models.Task, error) {
+func (o *Orchestrator) GetTask(ctx context.Context) (*models.AgentTask, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", o.Url+"/internal/task", nil)
 	if err != nil {
 		return nil, err
@@ -39,14 +40,14 @@ func (o *Orchestrator) GetTask(ctx context.Context) (*models.Task, error) {
 	if res.StatusCode != http.StatusOK {
 		switch res.StatusCode {
 		case http.StatusNotFound:
-			return nil, models.ErrNoTasks
+			return nil, errors.ErrNoTasks
 		default:
 			return nil, fmt.Errorf("request failed with status code %d", res.StatusCode)
 		}
 	}
 
 	task := &struct {
-		Task *models.Task `json:"task"`
+		Task *models.AgentTask `json:"task"`
 	}{}
 
 	err = json.NewDecoder(res.Body).Decode(&task)
@@ -74,7 +75,7 @@ func (o *Orchestrator) PostResult(ctx context.Context, result *models.TaskResult
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed status code %d", res.StatusCode)
+		return fmt.Errorf("failed to post result: request failed status code %d", res.StatusCode)
 	}
 
 	return nil

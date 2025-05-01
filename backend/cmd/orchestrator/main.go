@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"github.com/distributed-calc/v1/internal/orchestrator/adapters/queue"
 	"github.com/distributed-calc/v1/internal/orchestrator/config"
 	"github.com/distributed-calc/v1/internal/orchestrator/repository/memory"
 	"github.com/distributed-calc/v1/internal/orchestrator/service"
 	"github.com/distributed-calc/v1/internal/orchestrator/transport/http"
-	"github.com/distributed-calc/v1/pkg/models"
 	"go.uber.org/zap"
 	"log"
 	"os/signal"
@@ -33,11 +31,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	q := queue.NewQueueChan[models.Task](64)
-
 	rep := memory.NewRepositoryMemory()
-	planner := service.NewPlannerChan(cfg, q)
-	app := service.NewService(rep, planner, q)
+	app := service.NewService(rep, rep)
 
 	transportCfg := &http.TransportHttpConfig{
 		Host: cfg.Host,

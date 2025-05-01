@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	e "github.com/distributed-calc/v1/internal/orchestrator/errors"
+	"github.com/distributed-calc/v1/internal/orchestrator/models"
 	"github.com/distributed-calc/v1/pkg/middleware"
-	"github.com/distributed-calc/v1/pkg/models"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
@@ -18,12 +19,12 @@ const (
 )
 
 type Service interface {
-	StartEvaluation(ctx context.Context, expression string) (string, error)
+	Evaluate(ctx context.Context, expression string) (string, error)
 	Get(ctx context.Context, id string) (*models.Expression, error)
 	GetAll(ctx context.Context) ([]*models.Expression, error)
-	FinishTask(ctx context.Context, result *models.TaskResult) error
-	Enqueue(ctx context.Context, task *models.Task) error
-	Dequeue(ctx context.Context) (*models.Task, error)
+
+	GetTask(ctx context.Context) (*models.AgentTask, error)
+	FinishTask(ctx context.Context, task *models.TaskResult) error
 }
 
 type TransportHttpConfig struct {
@@ -77,7 +78,7 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var exp *models.Calculation
+	var exp *models.CalculateRequest
 	err := json.NewDecoder(r.Body).Decode(&exp)
 	if err != nil {
 		log.Error(err.Error())
@@ -85,12 +86,12 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id, err := t.s.StartEvaluation(r.Context(), exp.Expression)
+	id, err := t.s.Evaluate(r.Context(), exp.Expression)
 	if err != nil {
 		log.Error(err.Error())
 
 		switch {
-		case errors.Is(err, models.ErrInvalidExpression):
+		case errors.Is(err, e.ErrInvalidExpression):
 			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -130,7 +131,7 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 		log.Error(err.Error())
 
 		switch {
-		case errors.Is(err, models.ErrNoExpressions):
+		case errors.Is(err, e.ErrNoExpressions):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -140,7 +141,7 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 	}
 
 	if len(exp) < 1 {
-		http.Error(w, models.ErrNoExpressions.Error(), http.StatusNotFound)
+		http.Error(w, e.ErrNoExpressions.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -185,7 +186,7 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 		log.Error(err.Error(), zap.String("exp_id", id.String()))
 
 		switch {
-		case errors.Is(err, models.ErrExpressionDoesNotExist):
+		case errors.Is(err, e.ErrExpressionDoesNotExist):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -218,20 +219,20 @@ func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
-	task, err := t.s.Dequeue(r.Context())
+	task, err := t.s.GetTask(r.Context())
 	switch {
-	case errors.Is(err, models.ErrNoTasks):
-		t.log.Debug(err.Error())
+	case errors.Is(err, e.ErrNoTasks):
+		t.log.Debug("no tasks", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	case err != nil:
-		t.log.Error(err.Error())
+		t.log.Error("error getting task", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	data, err := json.Marshal(struct {
-		Task *models.Task `json:"task"`
+		Task *models.AgentTask `json:"task"`
 	}{
 		Task: task,
 	})
@@ -263,7 +264,7 @@ func (t *TransportHttp) handlePostResult(w http.ResponseWriter, r *http.Request)
 
 	err = t.s.FinishTask(r.Context(), result)
 	switch {
-	case errors.Is(err, models.ErrExpressionDoesNotExist):
+	case errors.Is(err, e.ErrExpressionDoesNotExist):
 		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
