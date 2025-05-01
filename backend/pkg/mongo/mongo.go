@@ -45,13 +45,15 @@ func (mc *Config) GetDSN() string {
 	if mc.Host != "" && mc.Port != 0 {
 		dsn.WriteString(
 			fmt.Sprintf(
-				"%s:%d/%s",
+				"@%s:%d/%s",
 				mc.Host,
 				mc.Port,
 				mc.DBName,
 			),
 		)
 	}
+
+	dsn.WriteString("?authSource=admin")
 
 	return dsn.String()
 }

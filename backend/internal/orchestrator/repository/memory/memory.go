@@ -35,7 +35,7 @@ func (rm *RepositoryMemory) Add(_ context.Context, exp *models.Expression) error
 	return nil
 }
 
-func (rm *RepositoryMemory) Get(_ context.Context, id, userID string) (*models.Expression, error) {
+func (rm *RepositoryMemory) Get(_ context.Context, id string) (*models.Expression, error) {
 	rm.expMu.RLock()
 	val, ok := rm.expM[id]
 	rm.expMu.RUnlock()

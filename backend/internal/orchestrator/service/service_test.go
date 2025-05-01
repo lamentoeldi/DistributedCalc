@@ -249,7 +249,7 @@ func TestService_GetAll(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = s.GetAll(context.Background(), "", "")
+	_, err = s.GetAll(context.Background(), "", "", 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

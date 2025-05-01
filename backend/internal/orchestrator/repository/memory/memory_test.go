@@ -37,7 +37,7 @@ func TestRepositoryMemory_Get(t *testing.T) {
 		t.Fatal("Failed to add expression to memory")
 	}
 
-	got, err := rep.Get(context.Background(), exp.Id, "")
+	got, err := rep.Get(context.Background(), exp.Id)
 	if err != nil {
 		t.Error("Failed to get expression from memory")
 	}
@@ -66,7 +66,7 @@ func TestRepositoryMemory_GetAll(t *testing.T) {
 		t.Fatal("Failed to add expression to memory")
 	}
 
-	got, err := rep.GetAll(context.Background(), "", "")
+	got, err := rep.GetAll(context.Background(), "", "", 10)
 	if err != nil {
 		t.Error("Failed to get all expressions from memory")
 	}

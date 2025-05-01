@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	e "github.com/distributed-calc/v1/internal/orchestrator/errors"
 	"github.com/distributed-calc/v1/internal/orchestrator/models"
 	mongo2 "github.com/distributed-calc/v1/pkg/mongo"
 	"go.mongodb.org/mongo-driver/bson"
@@ -47,7 +46,7 @@ func (r Repository) GetUser(ctx context.Context, login string) (*models.User, er
 	res := r.client.
 		Database(r.cfg.DBName).
 		Collection(collUsers).
-		FindOne(ctx, bson.M{"login": login})
+		FindOne(ctx, bson.M{"username": login})
 	if res.Err() != nil {
 		return nil, fmt.Errorf("failed to get user: %w", res.Err())
 	}
@@ -73,7 +72,7 @@ func (r Repository) Add(ctx context.Context, exp *models.Expression) error {
 	return nil
 }
 
-func (r Repository) Get(ctx context.Context, id, userID string) (*models.Expression, error) {
+func (r Repository) Get(ctx context.Context, id string) (*models.Expression, error) {
 	res := r.client.
 		Database(r.cfg.DBName).
 		Collection(collExp).
@@ -86,10 +85,6 @@ func (r Repository) Get(ctx context.Context, id, userID string) (*models.Express
 	err := res.Decode(&exp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get exp: %w", err)
-	}
-
-	if exp.UserID != userID {
-		return nil, fmt.Errorf("failed to get exp: %w: ", e.ErrUnauthorized)
 	}
 
 	return &exp, nil
@@ -150,8 +145,8 @@ func (r Repository) Update(ctx context.Context, exp *models.Expression) error {
 
 func (r Repository) AddTasks(ctx context.Context, tasks []*models.Task) error {
 	docs := make([]interface{}, 0, len(tasks))
-	for i, task := range tasks {
-		docs[i] = task
+	for _, task := range tasks {
+		docs = append(docs, task)
 	}
 
 	_, err := r.client.
@@ -218,7 +213,7 @@ func (r Repository) UpdateTask(ctx context.Context, task *models.Task) error {
 		Database(r.cfg.DBName).
 		Collection(collTasks).
 		UpdateMany(ctx, bson.M{"left_id": task.ID}, bson.M{
-			"%unset": bson.M{
+			"$unset": bson.M{
 				"left_id": "",
 			},
 		})
@@ -230,7 +225,7 @@ func (r Repository) UpdateTask(ctx context.Context, task *models.Task) error {
 		Database(r.cfg.DBName).
 		Collection(collTasks).
 		UpdateMany(ctx, bson.M{"right_id": task.ID}, bson.M{
-			"%unset": bson.M{
+			"$unset": bson.M{
 				"right_id": "",
 			},
 		})

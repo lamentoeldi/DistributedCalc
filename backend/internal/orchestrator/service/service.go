@@ -31,7 +31,7 @@ const (
 
 type ExpRepo interface {
 	Add(ctx context.Context, exp *models.Expression) error
-	Get(ctx context.Context, id, userID string) (*models.Expression, error)
+	Get(ctx context.Context, id string) (*models.Expression, error)
 	GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error)
 	Update(ctx context.Context, exp *models.Expression) error
 }
@@ -103,7 +103,16 @@ func (s *Service) Evaluate(ctx context.Context, expression, userID string) (stri
 }
 
 func (s *Service) Get(ctx context.Context, id, userID string) (*models.Expression, error) {
-	return s.expRepo.Get(ctx, id, userID)
+	exp, err := s.expRepo.Get(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get expression %w: ", err)
+	}
+
+	if exp.UserID != userID {
+		return nil, fmt.Errorf("failed to access expression %s: %w", id, e.ErrUnauthorized)
+	}
+
+	return exp, nil
 }
 
 func (s *Service) GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error) {

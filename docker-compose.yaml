@@ -45,3 +45,9 @@ services:
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - '8080:80'
+  mongo:
+    image: mongo:latest
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: dev
+      MONGO_INITDB_ROOT_PASSWORD: dev
