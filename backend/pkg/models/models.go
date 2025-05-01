@@ -8,17 +8,8 @@ type Task struct {
 	OperationTime int64   `json:"operation_time"`
 }
 
-type TaskResult struct {
-	Id     int     `json:"id"`
-	Result float64 `json:"result"`
-}
-
 type Expression struct {
 	Id     string  `json:"id"`
 	Status string  `json:"status"`
 	Result float64 `json:"result"`
-}
-
-type Calculation struct {
-	Expression string `json:"expression"`
 }
