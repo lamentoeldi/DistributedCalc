@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -48,7 +49,7 @@ type TaskRepo interface {
 }
 
 type BlackList interface {
-	Add(ctx context.Context, tokenID string) error
+	Add(ctx context.Context, tokenID string, ttl time.Duration) error
 	Remove(ctx context.Context, tokenID string) error
 	IsBlackListed(ctx context.Context, tokenID string) (bool, error)
 }
@@ -412,7 +413,14 @@ func (s *Service) RefreshTokens(ctx context.Context, token string) (string, stri
 		return "", "", fmt.Errorf("failed to refresh tokens: %w", err)
 	}
 
-	err = s.bl.Add(ctx, jti)
+	exp, err := claims.GetExpirationTime()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to extract expiration: %w", err)
+	}
+
+	refreshRemainingTTL := exp.Sub(time.Now())
+
+	err = s.bl.Add(ctx, jti, refreshRemainingTTL)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to revoke old refresh token: %w", err)
 	}

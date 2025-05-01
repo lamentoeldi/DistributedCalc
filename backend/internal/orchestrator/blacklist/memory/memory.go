@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 type Blacklist struct {
@@ -16,7 +17,7 @@ func NewBlacklist() *Blacklist {
 	}
 }
 
-func (b *Blacklist) Add(_ context.Context, tokenID string) error {
+func (b *Blacklist) Add(_ context.Context, tokenID string, _ time.Duration) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
