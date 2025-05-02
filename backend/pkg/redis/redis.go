@@ -27,7 +27,7 @@ func NewConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-func NewRedis(config *tls.Config) (redis.UniversalClient, error) {
+func NewRedis(tlsConfig *tls.Config) (redis.UniversalClient, error) {
 	cfg, err := NewConfig()
 	if err != nil {
 		return nil, fmt.Errorf("error initializing redis: %w", err)
@@ -40,7 +40,7 @@ func NewRedis(config *tls.Config) (redis.UniversalClient, error) {
 		DB:             cfg.DB,
 		MinIdleConns:   cfg.MinConns,
 		MaxActiveConns: cfg.MaxConns,
-		TLSConfig:      config,
+		TLSConfig:      tlsConfig,
 	})
 
 	return client, nil

@@ -14,7 +14,18 @@ services:
       - TIME_SUBTRACTION_MS=1
       - TIME_MULTIPLICATION_MS=1
       - TIME_DIVISION_MS=1
-      - LOG_LEVEL=info
+      - MONGO_HOST=mongo
+      - MONGO_PORT=27017
+      - MONGO_USER=dev
+      - MONGO_PASSWORD=dev
+      - MONGO_NAME=local
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   agent:
     build:
       dockerfile:
@@ -47,7 +58,20 @@ services:
       - '8080:80'
   mongo:
     image: mongo:latest
-    restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: dev
       MONGO_INITDB_ROOT_PASSWORD: dev
+    healthcheck:
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "'db.runCommand(\"ping\").ok'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+  redis:
+    image: redis:latest
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
