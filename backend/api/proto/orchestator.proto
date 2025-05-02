@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option go_package = "backend/pkg/proto/orchestrator";
+
+service Orchestrator {
+  rpc ProcessTasks(stream TaskResult) returns (stream Task);
+}
+
+message Task {
+  string id = 1;
+  float left_arg = 2;
+  float right_arg = 3;
+  string op = 4;
+  string operation_time = 5;
+  bool final = 6;
+}
+
+message TaskResult {
+  string id = 1;
+  float result = 2;
+  string status = 3;
+  bool final = 4;
+}
