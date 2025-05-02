@@ -24,10 +24,10 @@ const (
 type Task struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	LeftArg       float32                `protobuf:"fixed32,2,opt,name=left_arg,json=leftArg,proto3" json:"left_arg,omitempty"`
-	RightArg      float32                `protobuf:"fixed32,3,opt,name=right_arg,json=rightArg,proto3" json:"right_arg,omitempty"`
+	LeftArg       float64                `protobuf:"fixed64,2,opt,name=left_arg,json=leftArg,proto3" json:"left_arg,omitempty"`
+	RightArg      float64                `protobuf:"fixed64,3,opt,name=right_arg,json=rightArg,proto3" json:"right_arg,omitempty"`
 	Op            string                 `protobuf:"bytes,4,opt,name=op,proto3" json:"op,omitempty"`
-	OperationTime string                 `protobuf:"bytes,5,opt,name=operation_time,json=operationTime,proto3" json:"operation_time,omitempty"`
+	OperationTime int64                  `protobuf:"varint,5,opt,name=operation_time,json=operationTime,proto3" json:"operation_time,omitempty"`
 	Final         bool                   `protobuf:"varint,6,opt,name=final,proto3" json:"final,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -70,14 +70,14 @@ func (x *Task) GetId() string {
 	return ""
 }
 
-func (x *Task) GetLeftArg() float32 {
+func (x *Task) GetLeftArg() float64 {
 	if x != nil {
 		return x.LeftArg
 	}
 	return 0
 }
 
-func (x *Task) GetRightArg() float32 {
+func (x *Task) GetRightArg() float64 {
 	if x != nil {
 		return x.RightArg
 	}
@@ -91,11 +91,11 @@ func (x *Task) GetOp() string {
 	return ""
 }
 
-func (x *Task) GetOperationTime() string {
+func (x *Task) GetOperationTime() int64 {
 	if x != nil {
 		return x.OperationTime
 	}
-	return ""
+	return 0
 }
 
 func (x *Task) GetFinal() bool {
@@ -108,7 +108,7 @@ func (x *Task) GetFinal() bool {
 type TaskResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Result        float32                `protobuf:"fixed32,2,opt,name=result,proto3" json:"result,omitempty"`
+	Result        float64                `protobuf:"fixed64,2,opt,name=result,proto3" json:"result,omitempty"`
 	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	Final         bool                   `protobuf:"varint,4,opt,name=final,proto3" json:"final,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -152,7 +152,7 @@ func (x *TaskResult) GetId() string {
 	return ""
 }
 
-func (x *TaskResult) GetResult() float32 {
+func (x *TaskResult) GetResult() float64 {
 	if x != nil {
 		return x.Result
 	}
@@ -180,15 +180,15 @@ const file_orchestator_proto_rawDesc = "" +
 	"\x11orchestator.proto\"\x9b\x01\n" +
 	"\x04Task\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
-	"\bleft_arg\x18\x02 \x01(\x02R\aleftArg\x12\x1b\n" +
-	"\tright_arg\x18\x03 \x01(\x02R\brightArg\x12\x0e\n" +
+	"\bleft_arg\x18\x02 \x01(\x01R\aleftArg\x12\x1b\n" +
+	"\tright_arg\x18\x03 \x01(\x01R\brightArg\x12\x0e\n" +
 	"\x02op\x18\x04 \x01(\tR\x02op\x12%\n" +
-	"\x0eoperation_time\x18\x05 \x01(\tR\roperationTime\x12\x14\n" +
+	"\x0eoperation_time\x18\x05 \x01(\x03R\roperationTime\x12\x14\n" +
 	"\x05final\x18\x06 \x01(\bR\x05final\"b\n" +
 	"\n" +
 	"TaskResult\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06result\x18\x02 \x01(\x02R\x06result\x12\x16\n" +
+	"\x06result\x18\x02 \x01(\x01R\x06result\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\x14\n" +
 	"\x05final\x18\x04 \x01(\bR\x05final26\n" +
 	"\fOrchestrator\x12&\n" +

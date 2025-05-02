@@ -8,16 +8,16 @@ service Orchestrator {
 
 message Task {
   string id = 1;
-  float left_arg = 2;
-  float right_arg = 3;
+  double left_arg = 2;
+  double right_arg = 3;
   string op = 4;
-  string operation_time = 5;
+  int64 operation_time = 5;
   bool final = 6;
 }
 
 message TaskResult {
   string id = 1;
-  float result = 2;
+  double result = 2;
   string status = 3;
   bool final = 4;
 }
