@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -31,7 +32,7 @@ const (
 type ExpRepo interface {
 	Add(ctx context.Context, exp *models.Expression) error
 	Get(ctx context.Context, id string) (*models.Expression, error)
-	GetAll(ctx context.Context) ([]*models.Expression, error)
+	GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error)
 	Update(ctx context.Context, exp *models.Expression) error
 }
 
@@ -48,7 +49,7 @@ type TaskRepo interface {
 }
 
 type BlackList interface {
-	Add(ctx context.Context, tokenID string) error
+	Add(ctx context.Context, tokenID string, ttl time.Duration) error
 	Remove(ctx context.Context, tokenID string) error
 	IsBlackListed(ctx context.Context, tokenID string) (bool, error)
 }
@@ -71,7 +72,7 @@ func NewService(expRepo ExpRepo, taskRepo TaskRepo, userRepo UserRepo, auth *aut
 	}
 }
 
-func (s *Service) Evaluate(ctx context.Context, expression string) (string, error) {
+func (s *Service) Evaluate(ctx context.Context, expression, userID string) (string, error) {
 	err := validate(expression)
 	if err != nil {
 		return "", err
@@ -81,6 +82,7 @@ func (s *Service) Evaluate(ctx context.Context, expression string) (string, erro
 
 	exp := &models.Expression{
 		Id:     expID.String(),
+		UserID: userID,
 		Status: StatusPending,
 		Result: 0,
 	}
@@ -100,12 +102,21 @@ func (s *Service) Evaluate(ctx context.Context, expression string) (string, erro
 	return expID.String(), nil
 }
 
-func (s *Service) Get(ctx context.Context, id string) (*models.Expression, error) {
-	return s.expRepo.Get(ctx, id)
+func (s *Service) Get(ctx context.Context, id, userID string) (*models.Expression, error) {
+	exp, err := s.expRepo.Get(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get expression %w: ", err)
+	}
+
+	if exp.UserID != userID {
+		return nil, fmt.Errorf("failed to access expression %s: %w", id, e.ErrUnauthorized)
+	}
+
+	return exp, nil
 }
 
-func (s *Service) GetAll(ctx context.Context) ([]*models.Expression, error) {
-	return s.expRepo.GetAll(ctx)
+func (s *Service) GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error) {
+	return s.expRepo.GetAll(ctx, userID, cursor, limit)
 }
 
 func (s *Service) GetTask(ctx context.Context) (*models.AgentTask, error) {
@@ -161,18 +172,7 @@ func (s *Service) finalize(ctx context.Context, expID string, result float64) er
 		return err
 	}
 
-	err = s.taskRepo.DeleteTasks(ctx, expID)
-	if err != nil {
-		return err
-	}
-
 	return nil
-}
-
-type node struct {
-	left  *node
-	right *node
-	value token
 }
 
 type token struct {
@@ -412,10 +412,26 @@ func (s *Service) RefreshTokens(ctx context.Context, token string) (string, stri
 		return "", "", fmt.Errorf("failed to refresh tokens: %w", err)
 	}
 
-	err = s.bl.Add(ctx, jti)
+	exp, err := claims.GetExpirationTime()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to extract expiration: %w", err)
+	}
+
+	refreshRemainingTTL := exp.Sub(time.Now())
+
+	err = s.bl.Add(ctx, jti, refreshRemainingTTL)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to revoke old refresh token: %w", err)
 	}
 
 	return access, refresh, nil
+}
+
+func (s *Service) GetUserID(_ context.Context, token string) (string, error) {
+	claims, err := s.auth.VerifyAndExtract(token)
+	if err != nil {
+		return "", fmt.Errorf("failed to verify jwt token: %w", err)
+	}
+
+	return claims.GetSubject()
 }

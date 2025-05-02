@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,25 +12,28 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	methodNotAllowed = "method not allowed"
-	requestTimeout   = 5 * time.Second
+	methodNotAllowed       = "method not allowed"
+	requestTimeout         = 5 * time.Second
+	defaultLimit     int64 = 10
 )
 
 type Service interface {
-	Evaluate(ctx context.Context, expression string) (string, error)
-	Get(ctx context.Context, id string) (*models.Expression, error)
-	GetAll(ctx context.Context) ([]*models.Expression, error)
+	Evaluate(ctx context.Context, expression, userID string) (string, error)
+	Get(ctx context.Context, id, userID string) (*models.Expression, error)
+	GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error)
 
 	GetTask(ctx context.Context) (*models.AgentTask, error)
 	FinishTask(ctx context.Context, result *models.TaskResult) error
 
 	Register(ctx context.Context, creds *models.UserCredentials) error
 	Login(ctx context.Context, creds *models.UserCredentials) (*models.JWTTokens, error)
+	GetUserID(_ context.Context, token string) (string, error)
 
 	middleware.Auth
 }
@@ -119,7 +123,21 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id, err := t.s.Evaluate(ctx, exp.Expression)
+	authorization := r.Header.Get("Authorization")
+	if len(authorization) < len("Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken := strings.TrimPrefix(authorization, "Bearer ")
+
+	userID, err := t.s.GetUserID(ctx, accessToken)
+	if err != nil {
+		t.log.Error("failed to get user id", zap.Error(err))
+		return
+	}
+
+	expID, err := t.s.Evaluate(ctx, exp.Expression, userID)
 	if err != nil {
 		t.log.Error(err.Error())
 
@@ -134,7 +152,7 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 	}
 
 	data, err := json.Marshal(map[string]any{
-		"id": id,
+		"id": expID,
 	})
 	if err != nil {
 		t.log.Error(err.Error())
@@ -152,14 +170,38 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 
 	if r.Method != http.MethodGet {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+		return
 	}
 
-	exp, err := t.s.GetAll(ctx)
+	authorization := r.Header.Get("Authorization")
+	if len(authorization) < len("Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken := strings.TrimPrefix(authorization, "Bearer ")
+
+	userID, err := t.s.GetUserID(ctx, accessToken)
+	if err != nil {
+		t.log.Error("failed to get user id", zap.Error(err))
+		return
+	}
+
+	cursor := r.URL.Query().Get("cursor")
+	limitQuery := r.URL.Query().Get("limit")
+
+	var limit int64
+	limit, err = strconv.ParseInt(limitQuery, 10, 64)
+	if err != nil {
+		limit = defaultLimit
+	}
+
+	exp, err := t.s.GetAll(ctx, userID, cursor, limit)
 	if err != nil {
 		t.log.Error(err.Error())
 
 		switch {
-		case errors.Is(err, e.ErrNoExpressions):
+		case errors.Is(err, sql.ErrNoRows):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -204,7 +246,21 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	exp, err := t.s.Get(ctx, id.String())
+	authorization := r.Header.Get("Authorization")
+	if len(authorization) < len("Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken := strings.TrimPrefix(authorization, "Bearer ")
+
+	userID, err := t.s.GetUserID(ctx, accessToken)
+	if err != nil {
+		t.log.Error("failed to get user id", zap.Error(err))
+		return
+	}
+
+	exp, err := t.s.Get(ctx, id.String(), userID)
 	if err != nil {
 		t.log.Error(err.Error(), zap.String("exp_id", id.String()))
 

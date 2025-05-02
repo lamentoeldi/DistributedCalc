@@ -46,7 +46,7 @@ func (rm *RepositoryMemory) Get(_ context.Context, id string) (*models.Expressio
 	return val, nil
 }
 
-func (rm *RepositoryMemory) GetAll(_ context.Context) ([]*models.Expression, error) {
+func (rm *RepositoryMemory) GetAll(_ context.Context, _, _ string, _ int64) ([]*models.Expression, error) {
 	expressions := make([]*models.Expression, 0)
 
 	rm.expMu.RLock()
@@ -76,7 +76,6 @@ func (rm *RepositoryMemory) GetTask(_ context.Context) (*models.Task, error) {
 	defer rm.taskMu.RUnlock()
 	for _, task := range rm.taskM {
 		if task.Status == "ready" {
-			delete(rm.taskM, task.ID)
 			return task, nil
 		}
 	}
@@ -132,18 +131,18 @@ func (rm *RepositoryMemory) Update(_ context.Context, exp *models.Expression) er
 	return nil
 }
 
-func (r *RepositoryMemory) AddUser(_ context.Context, user *models.User) error {
-	r.usersMu.Lock()
-	defer r.usersMu.Unlock()
+func (rm *RepositoryMemory) AddUser(_ context.Context, user *models.User) error {
+	rm.usersMu.Lock()
+	defer rm.usersMu.Unlock()
 
-	r.usersM[user.Username] = user
+	rm.usersM[user.Username] = user
 	return nil
 }
 
-func (r *RepositoryMemory) GetUser(_ context.Context, login string) (*models.User, error) {
-	r.usersMu.RLock()
-	user, ok := r.usersM[login]
-	r.usersMu.RUnlock()
+func (rm *RepositoryMemory) GetUser(_ context.Context, login string) (*models.User, error) {
+	rm.usersMu.RLock()
+	user, ok := rm.usersM[login]
+	rm.usersMu.RUnlock()
 	if !ok {
 		return nil, errors.ErrExpressionDoesNotExist
 	}
