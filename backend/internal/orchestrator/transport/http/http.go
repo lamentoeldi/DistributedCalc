@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -200,7 +201,7 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 		t.log.Error(err.Error())
 
 		switch {
-		case errors.Is(err, e.ErrNoExpressions):
+		case errors.Is(err, sql.ErrNoRows):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)

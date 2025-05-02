@@ -198,13 +198,13 @@ func (r Repository) UpdateTask(ctx context.Context, task *models.Task) error {
 
 	_, err = client.
 		Database(r.cfg.DBName).
-		Collection(collTasks).
-		UpdateByID(ctx, task.ID, bson.M{
-			"$set": bson.M{
-				"result": task.Result,
-				"status": task.Status,
-			},
-		})
+		Collection(collTasks).DeleteOne(ctx, bson.M{"_id": task.ID})
+	//UpdateByID(ctx, task.ID, bson.M{
+	//	"$set": bson.M{
+	//		"result": task.Result,
+	//		"status": task.Status,
+	//	},
+	//})
 	if err != nil {
 		return fmt.Errorf("failed to update task: %w", err)
 	}
@@ -215,6 +215,9 @@ func (r Repository) UpdateTask(ctx context.Context, task *models.Task) error {
 		UpdateMany(ctx, bson.M{"left_id": task.ID}, bson.M{
 			"$unset": bson.M{
 				"left_id": "",
+			},
+			"$set": bson.M{
+				"left_arg": task.Result,
 			},
 		})
 	if err != nil {
@@ -227,6 +230,9 @@ func (r Repository) UpdateTask(ctx context.Context, task *models.Task) error {
 		UpdateMany(ctx, bson.M{"right_id": task.ID}, bson.M{
 			"$unset": bson.M{
 				"right_id": "",
+			},
+			"$set": bson.M{
+				"right_arg": task.Result,
 			},
 		})
 	if err != nil {

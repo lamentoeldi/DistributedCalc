@@ -8,9 +8,9 @@ type Task struct {
 	RightID  *string `bson:"right_id,omitempty"`
 	LeftArg  float64 `bson:"left_arg"`
 	RightArg float64 `bson:"right_arg"`
-	Result   float64 `bson:"result"`
-	Status   string  `bson:"status"`
-	Final    bool    `bson:"final"`
+	Result   float64
+	Status   string `bson:"status"`
+	Final    bool   `bson:"final"`
 }
 
 type TaskResult struct {

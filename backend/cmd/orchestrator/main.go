@@ -5,12 +5,14 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	memory2 "github.com/distributed-calc/v1/internal/orchestrator/blacklist/memory"
+	"github.com/distributed-calc/v1/internal/orchestrator/blacklist/redis"
 	"github.com/distributed-calc/v1/internal/orchestrator/config"
-	"github.com/distributed-calc/v1/internal/orchestrator/repository/memory"
+	"github.com/distributed-calc/v1/internal/orchestrator/repository/mongo"
 	"github.com/distributed-calc/v1/internal/orchestrator/service"
 	"github.com/distributed-calc/v1/internal/orchestrator/transport/http"
 	"github.com/distributed-calc/v1/pkg/authenticator"
+	mongo2 "github.com/distributed-calc/v1/pkg/mongo"
+	redis2 "github.com/distributed-calc/v1/pkg/redis"
 	"go.uber.org/zap"
 	"os/signal"
 	"syscall"
@@ -42,9 +44,20 @@ func main() {
 	accessTTL := 10 * time.Minute
 	refreshTTL := 7 * 24 * time.Hour
 
-	repo := memory.NewRepositoryMemory()
+	mongoConfig, err := mongo2.NewMongoConfig()
+	mongoClient, err := mongo2.NewMongoClient(ctx)
+	if err != nil {
+		logger.Fatal("failed to init mongo", zap.Error(err))
+	}
+	repo := mongo.NewMongoRepository(mongoConfig, mongoClient)
+
+	redisClient, err := redis2.NewRedis(nil)
+	if err != nil {
+		logger.Fatal("failed to init redis", zap.Error(err))
+	}
+	bl := redis.NewBlacklist(redisClient)
+
 	auth := authenticator.NewAuthenticator(accessPk, refreshPk, accessTTL, refreshTTL)
-	bl := memory2.NewBlacklist()
 
 	app := service.NewService(repo, repo, repo, auth, bl)
 

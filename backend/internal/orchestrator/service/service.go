@@ -172,18 +172,7 @@ func (s *Service) finalize(ctx context.Context, expID string, result float64) er
 		return err
 	}
 
-	err = s.taskRepo.DeleteTasks(ctx, expID)
-	if err != nil {
-		return err
-	}
-
 	return nil
-}
-
-type node struct {
-	left  *node
-	right *node
-	value token
 }
 
 type token struct {
