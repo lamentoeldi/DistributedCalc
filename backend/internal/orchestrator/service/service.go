@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/distributed-calc/v1/internal/orchestrator/config"
 	"github.com/distributed-calc/v1/internal/orchestrator/errors"
 	e "github.com/distributed-calc/v1/internal/orchestrator/errors"
 	"github.com/distributed-calc/v1/internal/orchestrator/models"
@@ -55,6 +56,7 @@ type BlackList interface {
 }
 
 type Service struct {
+	cfg      *config.Config
 	expRepo  ExpRepo
 	taskRepo TaskRepo
 	userRepo UserRepo
@@ -62,8 +64,9 @@ type Service struct {
 	auth     *authenticator.Authenticator
 }
 
-func NewService(expRepo ExpRepo, taskRepo TaskRepo, userRepo UserRepo, auth *authenticator.Authenticator, bl BlackList) *Service {
+func NewService(cfg *config.Config, expRepo ExpRepo, taskRepo TaskRepo, userRepo UserRepo, auth *authenticator.Authenticator, bl BlackList) *Service {
 	return &Service{
+		cfg:      cfg,
 		expRepo:  expRepo,
 		taskRepo: taskRepo,
 		userRepo: userRepo,
@@ -125,14 +128,26 @@ func (s *Service) GetTask(ctx context.Context) (*models.AgentTask, error) {
 		return nil, err
 	}
 
-	return &models.AgentTask{
-		Id:            task.ID,
-		LeftArg:       task.LeftArg,
-		RightArg:      task.RightArg,
-		Op:            task.Op,
-		OperationTime: 0,
-		Final:         task.Final,
-	}, nil
+	at := &models.AgentTask{
+		Id:       task.ID,
+		LeftArg:  task.LeftArg,
+		RightArg: task.RightArg,
+		Op:       task.Op,
+		Final:    task.Final,
+	}
+
+	switch at.Op {
+	case "+":
+		at.OperationTime = s.cfg.AdditionTime.Milliseconds()
+	case "-":
+		at.OperationTime = s.cfg.SubtractionTime.Milliseconds()
+	case "*":
+		at.OperationTime = s.cfg.MultiplicationTime.Milliseconds()
+	case "/":
+		at.OperationTime = s.cfg.DivisionTime.Milliseconds()
+	}
+
+	return at, nil
 }
 
 func (s *Service) FinishTask(ctx context.Context, task *models.TaskResult) error {
