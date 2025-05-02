@@ -6,6 +6,9 @@ import (
 	ma "github.com/distributed-calc/v1/internal/agent/models"
 	mo "github.com/distributed-calc/v1/internal/orchestrator/models"
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	"io"
 )
 
 type OrchestratorMock struct {
@@ -118,5 +121,120 @@ func (s ServiceMock) Finalize(_ context.Context, _ string, _ float64) error {
 		return s.Err
 	}
 
+	return nil
+}
+
+type BidiServerStream[Req, Res any] struct {
+	grpc.ServerStream
+	RecvCh     chan Req
+	SendCh     chan Res
+	recvErr    error
+	sendErr    error
+	SendClosed bool
+	RecvClosed bool
+}
+
+func NewMockBidiServerStream[Req, Res any]() *BidiServerStream[Req, Res] {
+	return &BidiServerStream[Req, Res]{
+		RecvCh: make(chan Req),
+		SendCh: make(chan Res),
+	}
+}
+
+func (b *BidiServerStream[Req, Res]) SetSendErr(err error) {
+	b.sendErr = err
+}
+
+func (b *BidiServerStream[Req, Res]) SetRecvErr(err error) {
+	b.recvErr = err
+}
+
+func (b *BidiServerStream[Req, Res]) Recv() (*Req, error) {
+	req := <-b.RecvCh
+
+	if b.recvErr != nil {
+		return nil, b.recvErr
+	}
+
+	return &req, nil
+}
+
+func (b *BidiServerStream[Req, Res]) Send(res *Res) error {
+	if b.SendClosed {
+		return nil
+	}
+
+	b.SendCh <- *res
+
+	if b.sendErr != nil {
+		return b.sendErr
+	}
+
+	return nil
+}
+
+func (b *BidiServerStream[Req, Res]) Context() context.Context {
+	return context.Background()
+}
+
+type BidiClientStream[Req, Res any] struct {
+	grpc.ServerStream
+	RecvCh     chan Res
+	SendCh     chan Req
+	recvErr    error
+	sendErr    error
+	SendClosed bool
+	RecvClosed bool
+}
+
+func NewMockBidiClientStream[Req, Res any]() *BidiClientStream[Req, Res] {
+	return &BidiClientStream[Req, Res]{
+		RecvCh: make(chan Res),
+		SendCh: make(chan Req),
+	}
+}
+
+func (b *BidiClientStream[Req, Res]) SetSendErr(err error) {
+	b.sendErr = err
+}
+
+func (b *BidiClientStream[Req, Res]) SetRecvErr(err error) {
+	b.recvErr = err
+}
+
+func (b *BidiClientStream[Req, Res]) Send(req *Req) error {
+	if b.SendClosed {
+		return nil
+	}
+
+	b.SendCh <- *req
+
+	if b.sendErr != nil {
+		return b.sendErr
+	}
+
+	return nil
+}
+
+func (b *BidiClientStream[Req, Res]) Recv() (*Res, error) {
+	req := <-b.RecvCh
+
+	if b.recvErr != nil {
+		return nil, b.recvErr
+	}
+
+	return &req, nil
+}
+
+func (b *BidiClientStream[Req, Res]) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (b *BidiClientStream[Req, Res]) Trailer() metadata.MD {
+	return nil
+}
+
+func (b *BidiClientStream[Req, Res]) CloseSend() error {
+	b.SetRecvErr(io.EOF)
 	return nil
 }

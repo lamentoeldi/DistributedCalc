@@ -73,7 +73,7 @@ func (s *Server) sendTasks(ctx context.Context, stream grpc.BidiStreamingServer[
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		case <-ticker.C:
 			task, err := s.service.GetTask(ctx)
 			if errors.Is(err, sql.ErrNoRows) {
@@ -104,7 +104,7 @@ func (s *Server) getTaskResults(ctx context.Context, stream grpc.BidiStreamingSe
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		default:
 			msg, err := stream.Recv()
 			if errors.Is(err, io.EOF) {
