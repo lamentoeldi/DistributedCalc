@@ -2,8 +2,7 @@ package config
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
-	"go.uber.org/zap/zapcore"
+	"github.com/ilyakaznacheev/cleanenv"
 	"time"
 )
 
@@ -15,75 +14,36 @@ var (
 )
 
 type Config struct {
-	PollTimeout  time.Duration
-	WorkersLimit int
-	MaxRetries   int
-	Url          string
-	BufferSize   int
-
-	LogLevel zapcore.Level
+	PollTimeout      time.Duration `env:"POLL_TIMEOUT" env-default:"100ms"`
+	WorkersLimit     int           `env:"WORKERS_LIMIT" env-default:"10"`
+	MaxRetries       int           `env:"MAX_RETRIES" env-default:"3"`
+	OrchestratorHost string        `env:"ORCHESTRATOR_HOST" env-default:"localhost"`
+	OrchestratorPort int           `env:"ORCHESTRATOR_PORT" env-default:"50051"`
+	BufferSize       int           `env:"BUFFER_SIZE" env-default:"10"`
 }
 
 func NewConfig() (*Config, error) {
-	viper.AutomaticEnv()
-
-	url := viper.GetString("master_url")
-	pollTimeout := viper.GetInt("poll_timeout")
-	workersLimit := viper.GetInt("computing_power")
-	maxRetries := viper.GetInt("max_retries")
-	bufferSize := viper.GetInt("buffer_size")
-
-	level := viper.GetString("log_level")
-
-	if url == "" {
-		url = "http://localhost:8080"
-	}
-
-	if pollTimeout == 0 {
-		pollTimeout = 50
-	}
-
-	if workersLimit == 0 {
-		workersLimit = 10
-	}
-
-	if maxRetries == 0 {
-		maxRetries = 3
-	}
-
-	if bufferSize == 0 {
-		bufferSize = 128
-	}
-
-	l, err := zapcore.ParseLevel(level)
+	var cfg Config
+	err := cleanenv.ReadEnv(&cfg)
 	if err != nil {
-		l = zapcore.InfoLevel
+		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	if pollTimeout < 1 {
+	if cfg.PollTimeout < 1 {
 		return nil, errInvalidTimeout
 	}
 
-	if workersLimit < 1 {
+	if cfg.WorkersLimit < 1 {
 		return nil, errInvalidWorkersLimit
 	}
 
-	if maxRetries < 0 {
+	if cfg.MaxRetries < 0 {
 		return nil, errInvalidMaxRetries
 	}
 
-	if bufferSize < 1 {
+	if cfg.BufferSize < 1 {
 		return nil, errInvalidBufferSize
 	}
 
-	cfg := &Config{
-		PollTimeout:  time.Duration(pollTimeout) * time.Millisecond,
-		WorkersLimit: workersLimit,
-		MaxRetries:   maxRetries,
-		Url:          url,
-		LogLevel:     l,
-		BufferSize:   bufferSize,
-	}
-
-	return cfg, nil
+	return &cfg, nil
 }

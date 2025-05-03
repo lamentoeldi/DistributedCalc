@@ -3,7 +3,6 @@ package http
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/distributed-calc/v1/internal/orchestrator/errors"
 	"github.com/distributed-calc/v1/test/mock"
 	"go.uber.org/zap"
@@ -12,18 +11,18 @@ import (
 	"testing"
 )
 
-var th *TransportHttp
+var th *Server
 var s *mock.ServiceMock
 
 func init() {
 	log, _ := zap.NewDevelopment()
 	s = &mock.ServiceMock{Err: nil}
-	cfg := &TransportHttpConfig{
+	cfg := &Config{
 		Host: "localhost",
 		Port: 8080,
 	}
 
-	th = NewTransportHttp(s, log, cfg)
+	th = NewServer(cfg, s, log)
 }
 
 func TestTransportHttp_Run(t *testing.T) {
@@ -204,99 +203,6 @@ func TestTransportHttp_handleExpression(t *testing.T) {
 			r := httptest.NewRecorder()
 
 			th.handleExpression(r, req)
-
-			if r.Code != tc.expectedStatus {
-				t.Errorf("expected status code %d, got %d", tc.expectedStatus, r.Code)
-			}
-		})
-	}
-}
-
-func TestTransportHttp_handleGetTask(t *testing.T) {
-	defer func() {
-		s.Err = nil
-	}()
-
-	cases := []struct {
-		name           string
-		method         string
-		err            error
-		expectedStatus int
-	}{
-		{
-			name:           "success",
-			method:         "GET",
-			err:            nil,
-			expectedStatus: http.StatusOK,
-		},
-		{
-			name:           "not found",
-			method:         "GET",
-			err:            errors.ErrNoTasks,
-			expectedStatus: http.StatusNotFound,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			s.Err = tc.err
-			fmt.Println(s.Err, tc.err)
-
-			req := httptest.NewRequest(tc.method, "/internal/tasks", nil)
-			r := httptest.NewRecorder()
-
-			th.handleGetTask(r, req)
-
-			if r.Code != tc.expectedStatus {
-				t.Errorf("expected status code %d, got %d", tc.expectedStatus, r.Code)
-			}
-		})
-	}
-}
-
-func TestTransportHttp_handlePostTask(t *testing.T) {
-	defer func() {
-		s.Err = nil
-	}()
-
-	cases := []struct {
-		name           string
-		method         string
-		body           string
-		err            error
-		expectedStatus int
-	}{
-		{
-			name:           "success",
-			method:         "POST",
-			body:           `{"expression": "2+2"}`,
-			err:            nil,
-			expectedStatus: http.StatusOK,
-		},
-		{
-			name:           "bad request",
-			method:         "POST",
-			body:           "invalid expression",
-			err:            errors.ErrInvalidExpression,
-			expectedStatus: http.StatusBadRequest,
-		},
-		{
-			name:           "not found",
-			method:         "POST",
-			body:           `{"expression": "2+2"}`,
-			err:            errors.ErrExpressionDoesNotExist,
-			expectedStatus: http.StatusNotFound,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			s.Err = tc.err
-
-			req := httptest.NewRequest(tc.method, "/internal/tasks", bytes.NewReader([]byte(tc.body)))
-			r := httptest.NewRecorder()
-
-			th.handlePostResult(r, req)
 
 			if r.Code != tc.expectedStatus {
 				t.Errorf("expected status code %d, got %d", tc.expectedStatus, r.Code)

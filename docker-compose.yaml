@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   orchestrator:
     build:
@@ -9,12 +7,24 @@ services:
         backend
     environment:
       - HOST=0.0.0.0
-      - PORT=8080
-      - TIME_ADDITION_MS=1
-      - TIME_SUBTRACTION_MS=1
-      - TIME_MULTIPLICATION_MS=1
-      - TIME_DIVISION_MS=1
-      - LOG_LEVEL=info
+      - HTTP_PORT=8080
+      - GRPC_PORT=50051
+      - TIME_ADDITION=1
+      - TIME_SUBTRACTION=1
+      - TIME_MULTIPLICATION=1
+      - TIME_DIVISION=1
+      - MONGO_HOST=mongo
+      - MONGO_PORT=27017
+      - MONGO_USER=dev
+      - MONGO_PASSWORD=dev
+      - MONGO_NAME=local
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   agent:
     build:
       dockerfile:
@@ -22,11 +32,11 @@ services:
       context:
         backend
     environment:
-      - LOG_LEVEL=info
-      - COMPUTING_POWER=10
-      - POLL_TIMEOUT=30
+      - WORKERS_LIMIT=10
+      - POLL_TIMEOUT=100ms
       - MAX_RETRIES=3
-      - MASTER_URL=http://orchestrator:8080
+      - ORCHESTRATOR_HOST=orchestrator
+      - ORCHESTRATOR_PORT=50051
     depends_on:
       - orchestrator
   frontend:
@@ -45,3 +55,24 @@ services:
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - '8080:80'
+    depends_on:
+      - orchestrator
+  mongo:
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: dev
+      MONGO_INITDB_ROOT_PASSWORD: dev
+    healthcheck:
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "'db.runCommand(\"ping\").ok'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+  redis:
+    image: redis:latest
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s

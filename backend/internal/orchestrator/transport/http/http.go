@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,28 +12,38 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const (
-	methodNotAllowed = "method not allowed"
+	methodNotAllowed       = "method not allowed"
+	requestTimeout         = 5 * time.Second
+	defaultLimit     int64 = 10
 )
 
 type Service interface {
-	Evaluate(ctx context.Context, expression string) (string, error)
-	Get(ctx context.Context, id string) (*models.Expression, error)
-	GetAll(ctx context.Context) ([]*models.Expression, error)
+	Evaluate(ctx context.Context, expression, userID string) (string, error)
+	Get(ctx context.Context, id, userID string) (*models.Expression, error)
+	GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error)
 
 	GetTask(ctx context.Context) (*models.AgentTask, error)
-	FinishTask(ctx context.Context, task *models.TaskResult) error
+	FinishTask(ctx context.Context, result *models.TaskResult) error
+
+	Register(ctx context.Context, creds *models.UserCredentials) error
+	Login(ctx context.Context, creds *models.UserCredentials) (*models.JWTTokens, error)
+	GetUserID(_ context.Context, token string) (string, error)
+
+	middleware.Auth
 }
 
-type TransportHttpConfig struct {
+type Config struct {
 	Host string
 	Port int
 }
 
-type TransportHttp struct {
+type Server struct {
 	s      Service
 	mux    *http.ServeMux
 	server *http.Server
@@ -41,8 +52,8 @@ type TransportHttp struct {
 	Port   int
 }
 
-func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *TransportHttp {
-	t := &TransportHttp{
+func NewServer(cfg *Config, s Service, log *zap.Logger) *Server {
+	t := &Server{
 		s:    s,
 		mux:  http.NewServeMux(),
 		log:  log,
@@ -50,18 +61,39 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *Tra
 		Port: cfg.Port,
 	}
 
-	t.mux.Handle("/api/v1/calculate", middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleCalculate))))
-	t.mux.Handle("/api/v1/expressions", middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleExpressions))))
-	t.mux.Handle("/api/v1/expressions/", middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleExpression))))
+	t.mux.
+		Handle(
+			"/api/v1/calculate",
+			middleware.MwLogger(log,
+				middleware.MwRecover(log,
+					middleware.MwAuth(log, s, http.HandlerFunc(t.handleCalculate)))))
+	t.mux.
+		Handle(
+			"/api/v1/expressions",
+			middleware.MwLogger(log,
+				middleware.MwRecover(log,
+					middleware.MwAuth(log, s, http.HandlerFunc(t.handleExpressions)))))
+	t.mux.
+		Handle(
+			"/api/v1/expressions/",
+			middleware.MwLogger(log,
+				middleware.MwRecover(log,
+					middleware.MwAuth(log, s, http.HandlerFunc(t.handleExpression)))))
 
-	t.mux.Handle("/internal/ping", middleware.MwRecover(log, http.HandlerFunc(t.handlePing)))
-	t.mux.Handle("/internal/task", middleware.MwRecover(log, http.HandlerFunc(t.handleTask)))
+	t.mux.
+		Handle(
+			"/api/v1/register",
+			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleRegister))))
+	t.mux.
+		Handle(
+			"/api/v1/login",
+			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleLogin))))
 
 	return t
 }
 
-func (t *TransportHttp) handlePing(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+func (t *Server) handlePing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
@@ -69,11 +101,11 @@ func (t *TransportHttp) handlePing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) {
-	reqID := r.Context().Value("request_id")
-	log := t.log.With(zap.Any("request_id", reqID))
+func (t *Server) handleCalculate(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
 
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
@@ -81,14 +113,28 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 	var exp *models.CalculateRequest
 	err := json.NewDecoder(r.Body).Decode(&exp)
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	id, err := t.s.Evaluate(r.Context(), exp.Expression)
+	authorization := r.Header.Get("Authorization")
+	if len(authorization) < len("Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken := strings.TrimPrefix(authorization, "Bearer ")
+
+	userID, err := t.s.GetUserID(ctx, accessToken)
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error("failed to get user id", zap.Error(err))
+		return
+	}
+
+	expID, err := t.s.Evaluate(ctx, exp.Expression, userID)
+	if err != nil {
+		t.log.Error(err.Error())
 
 		switch {
 		case errors.Is(err, e.ErrInvalidExpression):
@@ -101,37 +147,56 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 	}
 
 	data, err := json.Marshal(map[string]any{
-		"id": id,
+		"id": expID,
 	})
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	_, err = w.Write(data)
-	if err != nil {
-		log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	_, _ = w.Write(data)
 }
 
-func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request) {
-	reqID := r.Context().Value("request_id")
-	log := t.log.With(zap.Any("request_id", reqID))
+func (t *Server) handleExpressions(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
 
-	if r.Method != "GET" {
+	if r.Method != http.MethodGet {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+		return
 	}
 
-	exp, err := t.s.GetAll(r.Context())
+	authorization := r.Header.Get("Authorization")
+	if len(authorization) < len("Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken := strings.TrimPrefix(authorization, "Bearer ")
+
+	userID, err := t.s.GetUserID(ctx, accessToken)
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error("failed to get user id", zap.Error(err))
+		return
+	}
+
+	cursor := r.URL.Query().Get("cursor")
+	limitQuery := r.URL.Query().Get("limit")
+
+	var limit int64
+	limit, err = strconv.ParseInt(limitQuery, 10, 64)
+	if err != nil {
+		limit = defaultLimit
+	}
+
+	exp, err := t.s.GetAll(ctx, userID, cursor, limit)
+	if err != nil {
+		t.log.Error(err.Error())
 
 		switch {
-		case errors.Is(err, e.ErrNoExpressions):
+		case errors.Is(err, sql.ErrNoRows):
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -149,24 +214,19 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 		"expressions": exp,
 	})
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = w.Write(data)
-	if err != nil {
-		log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	_, _ = w.Write(data)
 }
 
-func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request) {
-	reqID := r.Context().Value("request_id")
-	log := t.log.With(zap.Any("request_id", reqID))
+func (t *Server) handleExpression(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
 
-	if r.Method != "GET" {
+	if r.Method != http.MethodGet {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
@@ -176,14 +236,28 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 	// To ensure uuid is valid
 	id, err := uuid.Parse(routes[len(routes)-1])
 	if err != nil {
-		log.Error(err.Error())
+		t.log.Error(err.Error())
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
-	exp, err := t.s.Get(r.Context(), id.String())
+	authorization := r.Header.Get("Authorization")
+	if len(authorization) < len("Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken := strings.TrimPrefix(authorization, "Bearer ")
+
+	userID, err := t.s.GetUserID(ctx, accessToken)
 	if err != nil {
-		log.Error(err.Error(), zap.String("exp_id", id.String()))
+		t.log.Error("failed to get user id", zap.Error(err))
+		return
+	}
+
+	exp, err := t.s.Get(ctx, id.String(), userID)
+	if err != nil {
+		t.log.Error(err.Error(), zap.String("exp_id", id.String()))
 
 		switch {
 		case errors.Is(err, e.ErrExpressionDoesNotExist):
@@ -199,83 +273,84 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 		"expression": exp,
 	})
 
-	_, err = w.Write(data)
-	if err != nil {
-		log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	_, _ = w.Write(data)
 }
 
-func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case "GET":
-		t.handleGetTask(w, r)
-	case "POST":
-		t.handlePostResult(w, r)
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	}
-}
+func (t *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
 
-func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
-	task, err := t.s.GetTask(r.Context())
-	switch {
-	case errors.Is(err, e.ErrNoTasks):
-		t.log.Debug("no tasks", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	case err != nil:
-		t.log.Error("error getting task", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if r.Method != http.MethodPost {
+		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
-	data, err := json.Marshal(struct {
-		Task *models.AgentTask `json:"task"`
-	}{
-		Task: task,
-	})
-	if err != nil {
-		t.log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(data)
-	if err != nil {
-		t.log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func (t *TransportHttp) handlePostResult(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	var result *models.TaskResult
-
-	err := json.NewDecoder(r.Body).Decode(&result)
+	var creds models.UserCredentials
+	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err = t.s.FinishTask(r.Context(), result)
-	switch {
-	case errors.Is(err, e.ErrExpressionDoesNotExist):
+	err = t.s.Register(ctx, &creds)
+	if err != nil {
 		t.log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	case err != nil:
-		t.log.Error(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+
+		switch {
+		case errors.Is(err, e.ErrBadRequest):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, e.ErrConflict):
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
-func (t *TransportHttp) Run() {
+func (t *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
+
+	if r.Method != http.MethodPost {
+		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+		return
+	}
+
+	defer r.Body.Close()
+
+	var creds models.UserCredentials
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil {
+		t.log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	tokens, err := t.s.Login(ctx, &creds)
+	if err != nil {
+		t.log.Error(err.Error())
+
+		switch {
+		case errors.Is(err, e.ErrUnauthorized):
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(tokens)
+	if err != nil {
+		t.log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (t *Server) Run() {
 	addr := fmt.Sprintf("%s:%d", t.Host, t.Port)
 	t.server = &http.Server{
 		Addr:    addr,
@@ -295,7 +370,7 @@ func (t *TransportHttp) Run() {
 	}()
 }
 
-func (t *TransportHttp) Shutdown(ctx context.Context) {
+func (t *Server) Shutdown(ctx context.Context) {
 	t.log.Info("Shutting down...")
 	err := t.server.Shutdown(ctx)
 	if err != nil {

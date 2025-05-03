@@ -3,13 +3,20 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/distributed-calc/v1/internal/orchestrator/config"
 	"github.com/distributed-calc/v1/internal/orchestrator/errors"
+	e "github.com/distributed-calc/v1/internal/orchestrator/errors"
 	"github.com/distributed-calc/v1/internal/orchestrator/models"
+	"github.com/distributed-calc/v1/pkg/authenticator"
+	"github.com/distributed-calc/v1/pkg/middleware"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"go/ast"
 	"go/parser"
+	"golang.org/x/crypto/bcrypt"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -26,8 +33,13 @@ const (
 type ExpRepo interface {
 	Add(ctx context.Context, exp *models.Expression) error
 	Get(ctx context.Context, id string) (*models.Expression, error)
-	GetAll(ctx context.Context) ([]*models.Expression, error)
+	GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error)
 	Update(ctx context.Context, exp *models.Expression) error
+}
+
+type UserRepo interface {
+	AddUser(ctx context.Context, user *models.User) error
+	GetUser(ctx context.Context, login string) (*models.User, error)
 }
 
 type TaskRepo interface {
@@ -37,19 +49,33 @@ type TaskRepo interface {
 	DeleteTasks(ctx context.Context, expID string) error
 }
 
-type Service struct {
-	expRepo  ExpRepo
-	taskRepo TaskRepo
+type BlackList interface {
+	Add(ctx context.Context, tokenID string, ttl time.Duration) error
+	Remove(ctx context.Context, tokenID string) error
+	IsBlackListed(ctx context.Context, tokenID string) (bool, error)
 }
 
-func NewService(expRepo ExpRepo, taskRepo TaskRepo) *Service {
+type Service struct {
+	cfg      *config.Config
+	expRepo  ExpRepo
+	taskRepo TaskRepo
+	userRepo UserRepo
+	bl       BlackList
+	auth     *authenticator.Authenticator
+}
+
+func NewService(cfg *config.Config, expRepo ExpRepo, taskRepo TaskRepo, userRepo UserRepo, auth *authenticator.Authenticator, bl BlackList) *Service {
 	return &Service{
+		cfg:      cfg,
 		expRepo:  expRepo,
 		taskRepo: taskRepo,
+		userRepo: userRepo,
+		auth:     auth,
+		bl:       bl,
 	}
 }
 
-func (s *Service) Evaluate(ctx context.Context, expression string) (string, error) {
+func (s *Service) Evaluate(ctx context.Context, expression, userID string) (string, error) {
 	err := validate(expression)
 	if err != nil {
 		return "", err
@@ -59,6 +85,7 @@ func (s *Service) Evaluate(ctx context.Context, expression string) (string, erro
 
 	exp := &models.Expression{
 		Id:     expID.String(),
+		UserID: userID,
 		Status: StatusPending,
 		Result: 0,
 	}
@@ -78,12 +105,21 @@ func (s *Service) Evaluate(ctx context.Context, expression string) (string, erro
 	return expID.String(), nil
 }
 
-func (s *Service) Get(ctx context.Context, id string) (*models.Expression, error) {
-	return s.expRepo.Get(ctx, id)
+func (s *Service) Get(ctx context.Context, id, userID string) (*models.Expression, error) {
+	exp, err := s.expRepo.Get(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get expression %w: ", err)
+	}
+
+	if exp.UserID != userID {
+		return nil, fmt.Errorf("failed to access expression %s: %w", id, e.ErrUnauthorized)
+	}
+
+	return exp, nil
 }
 
-func (s *Service) GetAll(ctx context.Context) ([]*models.Expression, error) {
-	return s.expRepo.GetAll(ctx)
+func (s *Service) GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error) {
+	return s.expRepo.GetAll(ctx, userID, cursor, limit)
 }
 
 func (s *Service) GetTask(ctx context.Context) (*models.AgentTask, error) {
@@ -92,14 +128,26 @@ func (s *Service) GetTask(ctx context.Context) (*models.AgentTask, error) {
 		return nil, err
 	}
 
-	return &models.AgentTask{
-		Id:            task.ID,
-		LeftArg:       task.LeftArg,
-		RightArg:      task.RightArg,
-		Op:            task.Op,
-		OperationTime: 0,
-		Final:         task.Final,
-	}, nil
+	at := &models.AgentTask{
+		Id:       task.ID,
+		LeftArg:  task.LeftArg,
+		RightArg: task.RightArg,
+		Op:       task.Op,
+		Final:    task.Final,
+	}
+
+	switch at.Op {
+	case "+":
+		at.OperationTime = s.cfg.AdditionTime.Milliseconds()
+	case "-":
+		at.OperationTime = s.cfg.SubtractionTime.Milliseconds()
+	case "*":
+		at.OperationTime = s.cfg.MultiplicationTime.Milliseconds()
+	case "/":
+		at.OperationTime = s.cfg.DivisionTime.Milliseconds()
+	}
+
+	return at, nil
 }
 
 func (s *Service) FinishTask(ctx context.Context, task *models.TaskResult) error {
@@ -139,18 +187,7 @@ func (s *Service) finalize(ctx context.Context, expID string, result float64) er
 		return err
 	}
 
-	err = s.taskRepo.DeleteTasks(ctx, expID)
-	if err != nil {
-		return err
-	}
-
 	return nil
-}
-
-type node struct {
-	left  *node
-	right *node
-	value token
 }
 
 type token struct {
@@ -305,4 +342,111 @@ func parseExpression(exprStr, expID string) ([]*models.Task, error) {
 
 	tasks[len(tasks)-1].Final = true
 	return tasks, nil
+}
+
+func (s *Service) Register(ctx context.Context, creds *models.UserCredentials) error {
+	id, _ := uuid.NewV7()
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(creds.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to register user: %w", err)
+	}
+
+	user := &models.User{
+		Id:             id.String(),
+		Username:       creds.Username,
+		HashedPassword: hash,
+	}
+
+	err = s.userRepo.AddUser(ctx, user)
+	if err != nil {
+		return fmt.Errorf("failed to register user: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) Login(ctx context.Context, creds *models.UserCredentials) (*models.JWTTokens, error) {
+	user, err := s.userRepo.GetUser(ctx, creds.Username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authorize user: %w: %w", e.ErrUnauthorized, err)
+	}
+
+	err = bcrypt.CompareHashAndPassword(user.HashedPassword, []byte(creds.Password))
+	if err != nil {
+		return nil, fmt.Errorf("failed to authorize user: %w: %w", e.ErrUnauthorized, err)
+	}
+
+	access, refresh, err := s.auth.SignTokens(s.auth.IssueTokens(user.Id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to issue tokens: %w", err)
+	}
+
+	return &models.JWTTokens{
+		AccessToken:  access,
+		RefreshToken: refresh,
+	}, nil
+}
+
+func (s *Service) VerifyJWT(_ context.Context, token string) error {
+	_, err := s.auth.VerifyAndExtract(token)
+	if err != nil {
+		return fmt.Errorf("failed to verify jwt token: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) RefreshTokens(ctx context.Context, token string) (string, string, error) {
+	claims, err := s.auth.VerifyAndExtract(token)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to verify jwt token: %w", err)
+	}
+
+	jti, ok := claims.(jwt.MapClaims)["jti"].(string)
+	if !ok {
+		return "", "", fmt.Errorf("failed to extract jti")
+	}
+
+	isBlacklisted, err := s.bl.IsBlackListed(ctx, jti)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to check blacklist: %w", err)
+	}
+
+	if isBlacklisted {
+		return "", "", fmt.Errorf("%w", middleware.ErrTokenWasRevoked)
+	}
+
+	sub, err := claims.GetSubject()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to extract subject: %w", err)
+	}
+
+	access, refresh, err := s.auth.SignTokens(s.auth.IssueTokens(sub))
+	if err != nil {
+		return "", "", fmt.Errorf("failed to refresh tokens: %w", err)
+	}
+
+	exp, err := claims.GetExpirationTime()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to extract expiration: %w", err)
+	}
+
+	refreshRemainingTTL := exp.Sub(time.Now())
+
+	err = s.bl.Add(ctx, jti, refreshRemainingTTL)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to revoke old refresh token: %w", err)
+	}
+
+	return access, refresh, nil
+}
+
+func (s *Service) GetUserID(_ context.Context, token string) (string, error) {
+	claims, err := s.auth.VerifyAndExtract(token)
+	if err != nil {
+		return "", fmt.Errorf("failed to verify jwt token: %w", err)
+	}
+
+	return claims.GetSubject()
 }

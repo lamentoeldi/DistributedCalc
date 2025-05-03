@@ -66,5 +66,9 @@ func (s *Service) Evaluate(t *models.AgentTask) (*models.TaskResult, error) {
 		}, nil
 	}
 
-	return nil, fmt.Errorf("unknown operation %s", t.Op)
+	return &models.TaskResult{
+		Id:     t.Id,
+		Status: statusFailure,
+		Final:  t.Final,
+	}, fmt.Errorf("unknown operation %s", t.Op)
 }

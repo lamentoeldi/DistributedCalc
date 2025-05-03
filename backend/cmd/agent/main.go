@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
-	"github.com/distributed-calc/v1/internal/agent/adapters/orchestrator"
+	"fmt"
 	"github.com/distributed-calc/v1/internal/agent/config"
 	"github.com/distributed-calc/v1/internal/agent/service"
-	"github.com/distributed-calc/v1/internal/agent/transport/async"
+	"github.com/distributed-calc/v1/internal/agent/transport/grpc"
 	"go.uber.org/zap"
-	"log"
-	"net/http"
+	g "google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"os/signal"
 	"syscall"
 )
@@ -18,33 +18,31 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	cfg, err := config.NewConfig()
-	if err != nil {
-		lg, _ := zap.NewProduction()
-		lg.Fatal(err.Error())
-	}
-
-	logConfig := zap.NewProductionConfig()
-	logConfig.Level = zap.NewAtomicLevelAt(cfg.LogLevel)
-
-	logger, err := logConfig.Build()
-	if err != nil {
-		log.Fatal(err)
-	}
+	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
-	api := orchestrator.NewOrchestrator(http.DefaultClient, cfg.Url, cfg.MaxRetries)
-	err = api.Ping()
+	cfg, err := config.NewConfig()
 	if err != nil {
-		logger.Fatal("Failed to connect to orchestrator", zap.Error(err))
+		logger.Fatal("error loading config", zap.Error(err))
 	}
 
 	app := service.NewService()
 
-	transport := async.NewTransportAsync(cfg, logger, api, app)
-	transport.Run(ctx)
+	creds := g.WithTransportCredentials(insecure.NewCredentials())
+
+	addr := fmt.Sprintf("%s:%d", cfg.OrchestratorHost, cfg.OrchestratorPort)
+	client, err := g.NewClient(addr, creds)
+	if err != nil {
+		logger.Fatal("error creating gRPC client", zap.Error(err))
+	}
+
+	server := grpc.NewServer(cfg, client, app)
+
+	err = server.Run(ctx)
+	if err != nil {
+		logger.Fatal("error starting server", zap.Error(err))
+	}
 
 	// Graceful stop
 	<-ctx.Done()
-	transport.Shutdown()
 }
