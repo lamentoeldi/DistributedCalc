@@ -38,12 +38,12 @@ type Service interface {
 	middleware.Auth
 }
 
-type TransportHttpConfig struct {
+type Config struct {
 	Host string
 	Port int
 }
 
-type TransportHttp struct {
+type Server struct {
 	s      Service
 	mux    *http.ServeMux
 	server *http.Server
@@ -52,8 +52,8 @@ type TransportHttp struct {
 	Port   int
 }
 
-func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *TransportHttp {
-	t := &TransportHttp{
+func NewServer(cfg *Config, s Service, log *zap.Logger) *Server {
+	t := &Server{
 		s:    s,
 		mux:  http.NewServeMux(),
 		log:  log,
@@ -89,16 +89,11 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *Tra
 			"/api/v1/login",
 			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleLogin))))
 
-	t.mux.
-		Handle(
-			"/internal/task",
-			middleware.MwRecover(log, http.HandlerFunc(t.handleTask)))
-
 	return t
 }
 
-func (t *TransportHttp) handlePing(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+func (t *Server) handlePing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
@@ -106,7 +101,7 @@ func (t *TransportHttp) handlePing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) {
+func (t *Server) handleCalculate(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
@@ -164,7 +159,7 @@ func (t *TransportHttp) handleCalculate(w http.ResponseWriter, r *http.Request) 
 	_, _ = w.Write(data)
 }
 
-func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request) {
+func (t *Server) handleExpressions(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
@@ -227,7 +222,7 @@ func (t *TransportHttp) handleExpressions(w http.ResponseWriter, r *http.Request
 	_, _ = w.Write(data)
 }
 
-func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request) {
+func (t *Server) handleExpression(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
@@ -281,7 +276,7 @@ func (t *TransportHttp) handleExpression(w http.ResponseWriter, r *http.Request)
 	_, _ = w.Write(data)
 }
 
-func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {
+func (t *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		t.handleGetTask(w, r)
@@ -292,7 +287,7 @@ func (t *TransportHttp) handleTask(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
+func (t *Server) handleGetTask(w http.ResponseWriter, r *http.Request) {
 	task, err := t.s.GetTask(r.Context())
 	switch {
 	case errors.Is(err, e.ErrNoTasks):
@@ -324,7 +319,7 @@ func (t *TransportHttp) handleGetTask(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (t *TransportHttp) handlePostResult(w http.ResponseWriter, r *http.Request) {
+func (t *Server) handlePostResult(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	var result *models.TaskResult
@@ -349,7 +344,7 @@ func (t *TransportHttp) handlePostResult(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (t *TransportHttp) handleRegister(w http.ResponseWriter, r *http.Request) {
+func (t *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
@@ -383,7 +378,7 @@ func (t *TransportHttp) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (t *TransportHttp) handleLogin(w http.ResponseWriter, r *http.Request) {
+func (t *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
@@ -423,7 +418,7 @@ func (t *TransportHttp) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (t *TransportHttp) Run() {
+func (t *Server) Run() {
 	addr := fmt.Sprintf("%s:%d", t.Host, t.Port)
 	t.server = &http.Server{
 		Addr:    addr,
@@ -443,7 +438,7 @@ func (t *TransportHttp) Run() {
 	}()
 }
 
-func (t *TransportHttp) Shutdown(ctx context.Context) {
+func (t *Server) Shutdown(ctx context.Context) {
 	t.log.Info("Shutting down...")
 	err := t.server.Shutdown(ctx)
 	if err != nil {

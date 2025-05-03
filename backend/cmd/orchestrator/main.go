@@ -9,11 +9,13 @@ import (
 	"github.com/distributed-calc/v1/internal/orchestrator/config"
 	"github.com/distributed-calc/v1/internal/orchestrator/repository/mongo"
 	"github.com/distributed-calc/v1/internal/orchestrator/service"
+	"github.com/distributed-calc/v1/internal/orchestrator/transport/grpc"
 	"github.com/distributed-calc/v1/internal/orchestrator/transport/http"
 	"github.com/distributed-calc/v1/pkg/authenticator"
 	mongo2 "github.com/distributed-calc/v1/pkg/mongo"
 	redis2 "github.com/distributed-calc/v1/pkg/redis"
 	"go.uber.org/zap"
+	g "google.golang.org/grpc"
 	"os/signal"
 	"syscall"
 	"time"
@@ -59,17 +61,25 @@ func main() {
 
 	auth := authenticator.NewAuthenticator(accessPk, refreshPk, accessTTL, refreshTTL)
 
-	app := service.NewService(repo, repo, repo, auth, bl)
+	app := service.NewService(cfg, repo, repo, repo, auth, bl)
 
-	transportCfg := &http.TransportHttpConfig{
+	httpServer := http.NewServer(&http.Config{
 		Host: cfg.Host,
-		Port: cfg.Port,
-	}
+		Port: cfg.HttpPort,
+	}, app, logger)
 
-	transport := http.NewTransportHttp(app, logger, transportCfg)
+	server := g.NewServer()
 
-	transport.Run()
+	grpcServer := grpc.NewServer(&grpc.Config{
+		Host:            cfg.Host,
+		GRPCPort:        cfg.GrpcPort,
+		SendTaskBackoff: cfg.PollDelay,
+	}, server, logger, app)
+
+	httpServer.Run()
+	grpcServer.Run()
 
 	<-ctx.Done()
-	transport.Shutdown(ctx)
+	httpServer.Shutdown(ctx)
+	grpcServer.Shutdown()
 }

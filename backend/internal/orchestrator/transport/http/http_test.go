@@ -12,18 +12,18 @@ import (
 	"testing"
 )
 
-var th *TransportHttp
+var th *Server
 var s *mock.ServiceMock
 
 func init() {
 	log, _ := zap.NewDevelopment()
 	s = &mock.ServiceMock{Err: nil}
-	cfg := &TransportHttpConfig{
+	cfg := &Config{
 		Host: "localhost",
 		Port: 8080,
 	}
 
-	th = NewTransportHttp(s, log, cfg)
+	th = NewServer(cfg, s, log)
 }
 
 func TestTransportHttp_Run(t *testing.T) {
