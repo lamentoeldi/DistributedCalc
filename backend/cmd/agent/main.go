@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/distributed-calc/v1/internal/agent/config"
 	"github.com/distributed-calc/v1/internal/agent/service"
 	"github.com/distributed-calc/v1/internal/agent/transport/grpc"
@@ -29,7 +30,8 @@ func main() {
 
 	creds := g.WithTransportCredentials(insecure.NewCredentials())
 
-	client, err := g.NewClient(cfg.OrchestratorURL, creds)
+	addr := fmt.Sprintf("%s:%d", cfg.OrchestratorHost, cfg.OrchestratorPort)
+	client, err := g.NewClient(addr, creds)
 	if err != nil {
 		logger.Fatal("error creating gRPC client", zap.Error(err))
 	}

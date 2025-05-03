@@ -14,11 +14,12 @@ var (
 )
 
 type Config struct {
-	PollTimeout     time.Duration `env:"POLL_TIMEOUT" env-default:"100ms"`
-	WorkersLimit    int           `env:"WORKERS_LIMIT" env-default:"10"`
-	MaxRetries      int           `env:"MAX_RETRIES" env-default:"3"`
-	OrchestratorURL string        `env:"ORCHESTRATOR_URL" env-default:"http://localhost:8080"`
-	BufferSize      int           `env:"BUFFER_SIZE" env-default:"10"`
+	PollTimeout      time.Duration `env:"POLL_TIMEOUT" env-default:"100ms"`
+	WorkersLimit     int           `env:"WORKERS_LIMIT" env-default:"10"`
+	MaxRetries       int           `env:"MAX_RETRIES" env-default:"3"`
+	OrchestratorHost string        `env:"ORCHESTRATOR_HOST" env-default:"localhost"`
+	OrchestratorPort int           `env:"ORCHESTRATOR_PORT" env-default:"50051"`
+	BufferSize       int           `env:"BUFFER_SIZE" env-default:"10"`
 }
 
 func NewConfig() (*Config, error) {
