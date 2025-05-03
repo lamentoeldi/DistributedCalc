@@ -105,7 +105,7 @@ func (s ServiceMock) Get(_ context.Context, _, _ string) (*mo.Expression, error)
 	}, nil
 }
 
-func (s ServiceMock) GetAll(_ context.Context, _ string) ([]*mo.Expression, error) {
+func (s ServiceMock) GetAll(_ context.Context, _, _ string, _ int64) ([]*mo.Expression, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
