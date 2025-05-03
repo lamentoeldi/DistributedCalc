@@ -89,11 +89,6 @@ func NewTransportHttp(s Service, log *zap.Logger, cfg *TransportHttpConfig) *Tra
 			"/api/v1/login",
 			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleLogin))))
 
-	t.mux.
-		Handle(
-			"/internal/task",
-			middleware.MwRecover(log, http.HandlerFunc(t.handleTask)))
-
 	return t
 }
 
