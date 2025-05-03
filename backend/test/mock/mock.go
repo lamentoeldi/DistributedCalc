@@ -57,7 +57,33 @@ type ServiceMock struct {
 	Err error
 }
 
-func (s ServiceMock) Evaluate(_ context.Context, expression string) (string, error) {
+func (s ServiceMock) Register(ctx context.Context, creds *mo.UserCredentials) error {
+	return s.Err
+}
+
+func (s ServiceMock) Login(_ context.Context, _ *mo.UserCredentials) (*mo.JWTTokens, error) {
+	return &mo.JWTTokens{
+		AccessToken:  "",
+		RefreshToken: "",
+	}, s.Err
+}
+
+func (s ServiceMock) GetUserID(_ context.Context, _ string) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s ServiceMock) VerifyJWT(_ context.Context, _ string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s ServiceMock) RefreshTokens(_ context.Context, _ string) (string, string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s ServiceMock) Evaluate(_ context.Context, _, _ string) (string, error) {
 	if s.Err != nil {
 		return "", s.Err
 	}
@@ -67,7 +93,7 @@ func (s ServiceMock) Evaluate(_ context.Context, expression string) (string, err
 	return id.String(), nil
 }
 
-func (s ServiceMock) Get(_ context.Context, _ string) (*mo.Expression, error) {
+func (s ServiceMock) Get(_ context.Context, _, _ string) (*mo.Expression, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
@@ -79,7 +105,7 @@ func (s ServiceMock) Get(_ context.Context, _ string) (*mo.Expression, error) {
 	}, nil
 }
 
-func (s ServiceMock) GetAll(_ context.Context) ([]*mo.Expression, error) {
+func (s ServiceMock) GetAll(_ context.Context, _ string) ([]*mo.Expression, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}

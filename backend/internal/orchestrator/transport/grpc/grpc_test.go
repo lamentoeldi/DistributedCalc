@@ -2,20 +2,16 @@ package grpc
 
 import (
 	"fmt"
-	"github.com/distributed-calc/v1/internal/orchestrator/config"
 	pb "github.com/distributed-calc/v1/pkg/proto/orchestrator"
 	"github.com/distributed-calc/v1/test/mock"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"io"
 	"testing"
+	"time"
 )
 
 func TestServer_ProcessTasks(t *testing.T) {
-	cfg := &config.Config{
-		PollDelay: 100,
-	}
-
 	log, _ := zap.NewDevelopment()
 
 	stream := mock.NewMockBidiServerStream[pb.TaskResult, pb.Task]()
@@ -58,7 +54,9 @@ func TestServer_ProcessTasks(t *testing.T) {
 		}
 	}()
 
-	app := NewServer(cfg, server, log, service)
+	app := NewServer(&Config{
+		SendTaskBackoff: 100 * time.Millisecond,
+	}, server, log, service)
 
 	err := app.ProcessTasks(stream)
 	if err != nil {
