@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-var th *TransportHttp
+var th *Server
 var s *mock.ServiceMock
 
 func init() {
@@ -23,7 +23,7 @@ func init() {
 		Port: 8080,
 	}
 
-	th = NewTransportHttp(s, log, cfg)
+	th = NewServer(s, log, cfg)
 }
 
 func TestTransportHttp_Run(t *testing.T) {

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/distributed-calc/v1/internal/orchestrator/config"
 	"github.com/distributed-calc/v1/internal/orchestrator/models"
 	pb "github.com/distributed-calc/v1/pkg/proto/orchestrator"
 	"go.uber.org/zap"
@@ -21,15 +20,21 @@ type Service interface {
 	FinishTask(ctx context.Context, result *models.TaskResult) error
 }
 
+type Config struct {
+	Host            string
+	GRPCPort        int
+	SendTaskBackoff time.Duration
+}
+
 type Server struct {
 	pb.UnimplementedOrchestratorServer
-	cfg     *config.Config
+	cfg     *Config
 	server  *grpc.Server
 	log     *zap.Logger
 	service Service
 }
 
-func NewServer(cfg *config.Config, server *grpc.Server, log *zap.Logger, service Service) *Server {
+func NewServer(cfg *Config, server *grpc.Server, log *zap.Logger, service Service) *Server {
 	app := &Server{
 		cfg:     cfg,
 		server:  server,
@@ -67,7 +72,7 @@ func (s *Server) ProcessTasks(stream grpc.BidiStreamingServer[pb.TaskResult, pb.
 }
 
 func (s *Server) sendTasks(ctx context.Context, stream grpc.BidiStreamingServer[pb.TaskResult, pb.Task]) error {
-	ticker := time.NewTicker(s.cfg.PollDelay)
+	ticker := time.NewTicker(s.cfg.SendTaskBackoff)
 	defer ticker.Stop()
 
 	for {
@@ -133,7 +138,7 @@ func (s *Server) getTaskResults(ctx context.Context, stream grpc.BidiStreamingSe
 
 func (s *Server) Run() {
 	go func() {
-		addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.GrpcPort)
+		addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.GRPCPort)
 		l, err := net.Listen("tcp", addr)
 		if err != nil {
 			s.log.Fatal("failed to listen", zap.Error(err))
