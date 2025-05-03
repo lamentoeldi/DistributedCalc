@@ -154,7 +154,7 @@ func TestParseExpression(t *testing.T) {
 
 func TestService_Evaluate(t *testing.T) {
 	repo := memory.NewRepositoryMemory()
-	s := NewService(repo, repo, nil, nil, nil)
+	s := NewService(nil, repo, repo, nil, nil, nil)
 
 	cases := []struct {
 		name       string
@@ -190,7 +190,7 @@ func TestService_Evaluate(t *testing.T) {
 
 func TestService_Get(t *testing.T) {
 	repo := memory.NewRepositoryMemory()
-	s := NewService(repo, repo, nil, nil, nil)
+	s := NewService(nil, repo, repo, nil, nil, nil)
 
 	found := uuid.NewString()
 
@@ -236,7 +236,7 @@ func TestService_Get(t *testing.T) {
 
 func TestService_GetAll(t *testing.T) {
 	repo := memory.NewRepositoryMemory()
-	s := NewService(repo, repo, nil, nil, nil)
+	s := NewService(nil, repo, repo, nil, nil, nil)
 
 	exp := &models.Expression{
 		Id:     uuid.NewString(),
