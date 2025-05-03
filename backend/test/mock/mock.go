@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	ma "github.com/distributed-calc/v1/internal/agent/models"
+	"github.com/distributed-calc/v1/internal/orchestrator/errors"
 	mo "github.com/distributed-calc/v1/internal/orchestrator/models"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"io"
+	"sync"
 )
 
 type OrchestratorMock struct {
@@ -263,4 +265,146 @@ func (b *BidiClientStream[Req, Res]) Trailer() metadata.MD {
 func (b *BidiClientStream[Req, Res]) CloseSend() error {
 	b.SetRecvErr(io.EOF)
 	return nil
+}
+
+type Repository struct {
+	expM  map[string]*mo.Expression
+	expMu sync.RWMutex
+
+	taskM  map[string]*mo.Task
+	taskMu sync.RWMutex
+
+	usersM  map[string]*mo.User
+	usersMu sync.RWMutex
+}
+
+func NewRepository() *Repository {
+	return &Repository{
+		expM:   make(map[string]*mo.Expression),
+		taskM:  make(map[string]*mo.Task),
+		usersM: make(map[string]*mo.User),
+	}
+}
+
+func (rm *Repository) Add(_ context.Context, exp *mo.Expression) error {
+	rm.expMu.Lock()
+	defer rm.expMu.Unlock()
+
+	rm.expM[exp.Id] = exp
+	return nil
+}
+
+func (rm *Repository) Get(_ context.Context, id string) (*mo.Expression, error) {
+	rm.expMu.RLock()
+	val, ok := rm.expM[id]
+	rm.expMu.RUnlock()
+	if !ok {
+		return nil, errors.ErrExpressionDoesNotExist
+	}
+
+	return val, nil
+}
+
+func (rm *Repository) GetAll(_ context.Context, _, _ string, _ int64) ([]*mo.Expression, error) {
+	expressions := make([]*mo.Expression, 0)
+
+	rm.expMu.RLock()
+	for _, val := range rm.expM {
+		expressions = append(expressions, val)
+	}
+	rm.expMu.RUnlock()
+
+	if len(expressions) < 1 {
+		return nil, errors.ErrNoExpressions
+	}
+
+	return expressions, nil
+}
+
+func (rm *Repository) AddTasks(_ context.Context, tasks []*mo.Task) error {
+	rm.taskMu.Lock()
+	defer rm.taskMu.Unlock()
+	for _, t := range tasks {
+		rm.taskM[t.ID] = t
+	}
+	return nil
+}
+
+func (rm *Repository) GetTask(_ context.Context) (*mo.Task, error) {
+	rm.taskMu.RLock()
+	defer rm.taskMu.RUnlock()
+	for _, task := range rm.taskM {
+		if task.Status == "ready" {
+			return task, nil
+		}
+	}
+	return nil, fmt.Errorf("%w: no ready task found", errors.ErrNoTasks)
+}
+
+func (rm *Repository) UpdateTask(_ context.Context, task *mo.Task) error {
+	rm.taskMu.Lock()
+	defer rm.taskMu.Unlock()
+	rm.taskM[task.ID] = task
+
+	for id, t := range rm.taskM {
+		if t.LeftID != nil && *t.LeftID == task.ID {
+			t.LeftArg = task.Result
+			t.LeftID = nil
+			if t.LeftID == nil && t.RightID == nil {
+				t.Status = "ready"
+			}
+			rm.taskM[id] = t
+		}
+		if t.RightID != nil && *t.RightID == task.ID {
+			t.RightArg = task.Result
+			t.RightID = nil
+			if t.LeftID == nil && t.RightID == nil {
+				t.Status = "ready"
+			}
+			rm.taskM[id] = t
+		}
+	}
+
+	return nil
+}
+
+func (rm *Repository) DeleteTasks(_ context.Context, expID string) error {
+	rm.taskMu.Lock()
+	defer rm.taskMu.Unlock()
+
+	for _, task := range rm.taskM {
+		if task.ExpID == expID {
+			delete(rm.taskM, task.ID)
+		}
+	}
+
+	return nil
+}
+
+func (rm *Repository) Update(_ context.Context, exp *mo.Expression) error {
+	rm.expMu.Lock()
+	defer rm.expMu.Unlock()
+
+	rm.expM[exp.Id] = exp
+
+	return nil
+}
+
+func (rm *Repository) AddUser(_ context.Context, user *mo.User) error {
+	rm.usersMu.Lock()
+	defer rm.usersMu.Unlock()
+
+	rm.usersM[user.Username] = user
+	return nil
+}
+
+func (rm *Repository) GetUser(_ context.Context, login string) (*mo.User, error) {
+	rm.usersMu.RLock()
+	user, ok := rm.usersM[login]
+	rm.usersMu.RUnlock()
+	if !ok {
+		return nil, errors.ErrExpressionDoesNotExist
+	}
+
+	return user, nil
 }

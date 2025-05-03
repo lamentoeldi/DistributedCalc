@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"github.com/distributed-calc/v1/internal/orchestrator/models"
-	"github.com/distributed-calc/v1/internal/orchestrator/repository/memory"
+	"github.com/distributed-calc/v1/test/mock"
 	"github.com/google/uuid"
 	"testing"
 )
@@ -153,7 +153,7 @@ func TestParseExpression(t *testing.T) {
 }
 
 func TestService_Evaluate(t *testing.T) {
-	repo := memory.NewRepositoryMemory()
+	repo := mock.NewRepository()
 	s := NewService(nil, repo, repo, nil, nil, nil)
 
 	cases := []struct {
@@ -189,7 +189,7 @@ func TestService_Evaluate(t *testing.T) {
 }
 
 func TestService_Get(t *testing.T) {
-	repo := memory.NewRepositoryMemory()
+	repo := mock.NewRepository()
 	s := NewService(nil, repo, repo, nil, nil, nil)
 
 	found := uuid.NewString()
@@ -235,7 +235,7 @@ func TestService_Get(t *testing.T) {
 }
 
 func TestService_GetAll(t *testing.T) {
-	repo := memory.NewRepositoryMemory()
+	repo := mock.NewRepository()
 	s := NewService(nil, repo, repo, nil, nil, nil)
 
 	exp := &models.Expression{
