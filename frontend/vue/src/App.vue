@@ -1,6 +1,5 @@
 <script lang="ts">
 import {RouterLink, RouterView} from 'vue-router'
-import type MenuOption from 'naive-ui'
 import type { Component } from "vue";
 import { defineComponent, h, ref } from 'vue'
 import { NIcon, darkTheme } from 'naive-ui'
@@ -11,12 +10,13 @@ import {
   SearchOutline as FindIcon,
   ListOutline as ExpressionsIcon,
 } from '@vicons/ionicons5'
+import {useUserStore} from "@/stores/user.ts";
 
 const renderIcon = (icon: Component) => {
   return () => h(NIcon, null, { default: () => h(icon) })
 }
 
-const menuOptions: MenuOption[] = [
+const menuOptions = [
   {
     label: () =>
       h(
@@ -101,10 +101,15 @@ const menuOptions: MenuOption[] = [
 
 export default defineComponent({
   setup() {
+    const userStore = useUserStore()
+    userStore.fetchUser()
+
     return {
       darkTheme,
       collapsed: ref(true),
-      menuOptions
+      menuOptions,
+      userStore,
+      RouterView
     }
   }
 })

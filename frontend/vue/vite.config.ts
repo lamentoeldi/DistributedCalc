@@ -38,6 +38,6 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../elysia/public'
+    outDir: '../bff/.dist'
   }
 })

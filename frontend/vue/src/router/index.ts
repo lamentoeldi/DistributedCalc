@@ -1,9 +1,10 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import { createRouter, createWebHistory } from 'vue-router';
+import HomeView from '@/views/HomeView.vue';
 import AuthView from "@/views/AuthView.vue";
 import CalculateView from "@/views/CalculateView.vue";
 import FindVue from "@/views/FindVue.vue";
 import ExpressionsView from "@/views/ExpressionsView.vue";
+import NotFoundView from "@/views/NotFoundView.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -37,6 +38,11 @@ const router = createRouter({
       name: 'find',
       component: FindVue,
       meta: { title: 'Find' }
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'notFound',
+      component: NotFoundView
     }
   ],
 })

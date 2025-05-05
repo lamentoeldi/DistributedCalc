@@ -1,0 +1,13 @@
+{
+  "name": "my-app",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "bff",
+    "vue"
+  ],
+  "dependencies": {
+    "elysia": "latest",
+    "@elysiajs/eden": "latest"
+  }
+}

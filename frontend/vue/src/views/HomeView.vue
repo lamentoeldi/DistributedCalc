@@ -1,9 +1,11 @@
-<script>
+<script lang="ts">
   import { defineComponent } from "vue";
   import {
     LogoGithub
   } from "@vicons/ionicons5";
-  import { darkTheme } from 'naive-ui'
+  import {
+    darkTheme,
+  } from 'naive-ui'
 
   export default defineComponent({
     components: {
@@ -46,7 +48,7 @@
         DistributedCalc provides smooth and delightful experience via extensive and performant API
       </n-card>
       <n-card title="How do I start using DistributedCalc?" :theme="darkTheme">
-        Proceed to <RouterLink to="auth" class="ref">registration</RouterLink> and enjoy your stay
+        Proceed to <RouterLink to="auth" class="ref">registration page</RouterLink> and enjoy your stay
       </n-card>
     </div>
   </main>
