@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { treaty } from '@elysiajs/eden'
-import type { App } from '../../../bff/src'
+import type { App } from 'bff/src'
 
 export const useUserStore = defineStore('user', () => {
   const isAuthorized = ref(false)
@@ -11,7 +11,7 @@ export const useUserStore = defineStore('user', () => {
   const fetchUser = async() => {
     const app = treaty<App>(window.location.origin)
 
-    const { data, error } = await app.api.v1.authorize.get()
+    const { data, error } = await app.bff.api.v1.authorize.get()
     if (!data || error) {
       return
     }

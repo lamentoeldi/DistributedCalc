@@ -12,7 +12,7 @@ const logger = new Elysia()
 
 const auth = new Elysia()
     .post(
-        "/api/v1/register",
+        "/bff/api/v1/register",
         async ({ body }) => {
             const res = await fetch(`http://${backend_host}:${backend_port}/api/v1/register`, {
                 method: "POST",
@@ -26,12 +26,12 @@ const auth = new Elysia()
         {
             body: t.Object({
                 login: t.String(),
-                password: t.Integer()
+                password: t.String()
             })
         }
     )
     .post(
-        "/api/v1/login",
+        "/bff/api/v1/login",
         async ({ body, cookie: { access_token, refresh_token } }) => {
             if (!refresh_token) {
                 error(401)
@@ -59,12 +59,12 @@ const auth = new Elysia()
         {
             body: t.Object({
                 login: t.String(),
-                password: t.Integer()
+                password: t.String()
             })
         }
     )
     .get(
-        "/api/v1/authorize",
+        "/bff/api/v1/authorize",
         async ({ cookie: { access_token, refresh_token } } ) => {
             const res = await fetch(`http://${backend_host}:${backend_port}/api/v1/authorize`, {
                 headers: {
@@ -91,7 +91,7 @@ const auth = new Elysia()
 
 const calculator = new Elysia()
     .post(
-        "/api/v1/calculate",
+        "/bff/api/v1/calculate",
         async ({ body, cookie: { access_token, refresh_token } }) => {
             const res = await fetch(`http://${backend_host}:${backend_port}/api/v1/calculate`, {
                 method: "POST",
@@ -134,7 +134,7 @@ const calculator = new Elysia()
         }
     )
     .get(
-        "/api/v1/expressions",
+        "/bff/api/v1/expressions",
         async ({ query: { cursor, limit }, cookie: { access_token, refresh_token } }) => {
             let url = `http://${backend_host}:${backend_port}/api/v1/expressions`
 
@@ -183,7 +183,7 @@ const calculator = new Elysia()
             return data
         }
     )
-    .get("/api/v1/expressions/:id", async ({ params: { id }, cookie: { access_token, refresh_token }}) => {
+    .get("/bff/api/v1/expressions/:id", async ({ params: { id }, cookie: { access_token, refresh_token }}) => {
         const res = await fetch(`http://${backend_host}:${backend_port}/api/v1/expressions/${id}`, {
             headers: {
                 'Authorization': `Bearer ${access_token.value}`,

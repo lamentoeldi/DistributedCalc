@@ -8,6 +8,7 @@ import {
   NConfigProvider,
   NLayout,
   NLayoutSider,
+  NMessageProvider,
   darkTheme
 } from 'naive-ui'
 import {
@@ -116,38 +117,34 @@ userStore.fetchUser()
   <n-config-provider
     :theme="darkTheme"
   >
-    <n-layout has-sider
-    >
-      <n-layout-sider
-          bordered
-          collapse-mode="width"
-          :collapsed-width="64"
-          :width="160"
-          :collapsed="collapsed"
-          show-trigger
-          @collapse="collapsed = true"
-          @expand="collapsed = false"
+    <n-message-provider>
+      <n-layout has-sider
       >
-        <n-menu
-            :collapsed="collapsed"
+        <n-layout-sider
+            bordered
+            collapse-mode="width"
             :collapsed-width="64"
-            :collapsed-icon-size="22"
-            :options="menuOptions"
-        />
-      </n-layout-sider>
-      <RouterView/>
-    </n-layout>
+            :width="160"
+            :collapsed="collapsed"
+            show-trigger
+            @collapse="collapsed = true"
+            @expand="collapsed = false"
+        >
+          <n-menu
+              :collapsed="collapsed"
+              :collapsed-width="64"
+              :collapsed-icon-size="22"
+              :options="menuOptions"
+          />
+        </n-layout-sider>
+        <RouterView/>
+      </n-layout>
+    </n-message-provider>
   </n-config-provider>
 </template>
 
 <style scoped>
-.n-config-provider {
-  height: 100%;
-}
-  .n-layout {
-    height: 100%;
-  }
-  .ec {
+  .n-layout, .ec, .n-config-provider, .n-message-provider {
     height: 100%;
   }
   .bd {
