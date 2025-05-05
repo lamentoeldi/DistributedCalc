@@ -1,23 +1,12 @@
-<script lang="ts">
-  import { defineComponent } from "vue";
-  import {
-    LogoGithub
-  } from "@vicons/ionicons5";
-  import {
-    darkTheme,
-  } from 'naive-ui'
-
-  export default defineComponent({
-    components: {
-      LogoGithub
-    },
-    setup() {
-      return {
-        darkTheme,
-        LogoGithub
-      }
-    }
-  })
+<script setup lang="ts">
+import {
+  LogoGithub
+} from "@vicons/ionicons5";
+import {
+  NTooltip,
+  NIcon,
+  NCard
+} from 'naive-ui'
 </script>
 
 <template>
@@ -41,13 +30,13 @@
       DistributedCalc
     </h1>
     <div class="row-start-2 col-start-3 col-end-11">
-      <n-card title="What is DistributedCalc?" :theme="darkTheme">
+      <n-card title="What is DistributedCalc?">
         DistributedCalc is top-class online calculation platform
       </n-card>
-      <n-card title="Why DistributedCalc?" :theme="darkTheme">
+      <n-card title="Why DistributedCalc?">
         DistributedCalc provides smooth and delightful experience via extensive and performant API
       </n-card>
-      <n-card title="How do I start using DistributedCalc?" :theme="darkTheme">
+      <n-card title="How do I start using DistributedCalc?">
         Proceed to <RouterLink to="auth" class="ref">registration page</RouterLink> and enjoy your stay
       </n-card>
     </div>

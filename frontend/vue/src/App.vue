@@ -1,14 +1,21 @@
-<script lang="ts">
+<script setup lang="ts">
 import {RouterLink, RouterView} from 'vue-router'
 import type { Component } from "vue";
-import { defineComponent, h, ref } from 'vue'
-import { NIcon, darkTheme } from 'naive-ui'
+import { h, ref } from 'vue'
+import {
+  NIcon,
+  NMenu,
+  NConfigProvider,
+  NLayout,
+  NLayoutSider,
+  darkTheme
+} from 'naive-ui'
 import {
   HomeOutline as HomeIcon,
   PersonOutline as AuthIcon,
   AddCircleOutline as CalculateIcon,
   SearchOutline as FindIcon,
-  ListOutline as ExpressionsIcon,
+  ListOutline as ExpressionsIcon
 } from '@vicons/ionicons5'
 import {useUserStore} from "@/stores/user.ts";
 
@@ -99,50 +106,44 @@ const menuOptions = [
   }
 ]
 
-export default defineComponent({
-  setup() {
-    const userStore = useUserStore()
-    userStore.fetchUser()
+const collapsed = ref(true)
 
-    return {
-      darkTheme,
-      collapsed: ref(true),
-      menuOptions,
-      userStore,
-      RouterView
-    }
-  }
-})
+const userStore = useUserStore()
+userStore.fetchUser()
 </script>
 
 <template>
-  <n-layout has-sider
-        :theme="darkTheme"
+  <n-config-provider
+    :theme="darkTheme"
   >
-    <n-layout-sider
-        bordered
-        collapse-mode="width"
-        :theme="darkTheme"
-        :collapsed-width="64"
-        :width="160"
-        :collapsed="collapsed"
-        show-trigger
-        @collapse="collapsed = true"
-        @expand="collapsed = false"
+    <n-layout has-sider
     >
-      <n-menu
-          :theme="darkTheme"
-          :collapsed="collapsed"
+      <n-layout-sider
+          bordered
+          collapse-mode="width"
           :collapsed-width="64"
-          :collapsed-icon-size="22"
-          :options="menuOptions"
-      />
-    </n-layout-sider>
-    <RouterView/>
-  </n-layout>
+          :width="160"
+          :collapsed="collapsed"
+          show-trigger
+          @collapse="collapsed = true"
+          @expand="collapsed = false"
+      >
+        <n-menu
+            :collapsed="collapsed"
+            :collapsed-width="64"
+            :collapsed-icon-size="22"
+            :options="menuOptions"
+        />
+      </n-layout-sider>
+      <RouterView/>
+    </n-layout>
+  </n-config-provider>
 </template>
 
 <style scoped>
+.n-config-provider {
+  height: 100%;
+}
   .n-layout {
     height: 100%;
   }

@@ -1,23 +1,13 @@
-<script lang="ts">
+<script setup lang="ts">
 import {
-  darkTheme,
+  NCard,
 } from 'naive-ui'
-import { defineComponent } from 'vue'
-
-export default defineComponent({
-  setup() {
-    return {
-      darkTheme
-    }
-  }
-})
 </script>
 
 <template>
   <div class="container flex justify-center items-center">
     <n-card
         title="Ooops... Page not found"
-        :theme="darkTheme"
     >
       Looks like the page you are looking for does not exist. Redirect to the <RouterLink to="/" class="ref">home page</RouterLink>?
     </n-card>
