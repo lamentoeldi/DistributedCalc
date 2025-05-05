@@ -6,7 +6,7 @@ const backend_port = process.env.BACKEND_PORT ?? "8080"
 
 const port = process.env.PORT ?? "3000"
 
-const bff = new Elysia()
+const auth = new Elysia()
     .post("/api/v1/register", async ({ body }) => {
         const res = await fetch(`http://${backend_host}:${backend_port}/api/v1/register`, {
             method: "POST",
@@ -28,14 +28,28 @@ const bff = new Elysia()
             return
         }
 
-        const rb = await res.json()
+        const data = await res.json()
 
-        access_token.value = rb.access_token
+        access_token.value = data.access_token
         access_token.httpOnly = true
 
-        refresh_token.value = rb.refresh_token
+        refresh_token.value = data.refresh_token
         refresh_token.httpOnly = true
     })
+    .get("/api/v1/authorize", async ({ cookie: { access_token, refresh_token } } ) => {
+        const res = await fetch(`http://${backend_host}:${backend_port}/api/v1/authorize`)
+
+        if (!res.ok) {
+            error(res.status)
+            return
+        }
+
+        const data = await res.json()
+
+        return { data }
+    })
+
+const calculator = new Elysia()
     .post("/api/v1/calculate", async ({ body, cookie: { access_token, refresh_token } }) => {
         const res = await fetch(`http://${backend_host}:${backend_port}/api/v1/calculate`, {
             method: "POST",
@@ -147,7 +161,8 @@ const app = new Elysia()
         prefix: '/',
         alwaysStatic: true
     }))
-    .use(bff)
+    .use(calculator)
+    .use(auth)
     .listen(port);
 
 console.log(
