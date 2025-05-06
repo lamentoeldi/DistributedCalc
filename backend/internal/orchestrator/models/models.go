@@ -55,3 +55,8 @@ type User struct {
 	Username       string `json:"username" bson:"username"`
 	HashedPassword []byte `json:"hashed_password" bson:"hashed_password"`
 }
+
+type UserView struct {
+	Id       string `json:"id" bson:"_id"`
+	Username string `json:"username" bson:"username"`
+}

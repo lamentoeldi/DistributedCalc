@@ -408,3 +408,7 @@ func (rm *Repository) GetUser(_ context.Context, login string) (*mo.User, error)
 
 	return user, nil
 }
+
+func (rm *Repository) GetUserByID(_ context.Context, userID string) (*mo.User, error) {
+	return &mo.User{}, nil
+}

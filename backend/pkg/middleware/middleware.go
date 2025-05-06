@@ -85,7 +85,7 @@ func MwAuth(log *zap.Logger, auth Auth, next http.Handler) http.Handler {
 
 		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", newAccess))
 
-		w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", newAccess))
+		w.Header().Set("Access", newAccess)
 		w.Header().Set("Refresh-Token", newRefresh)
 
 		next.ServeHTTP(w, r)

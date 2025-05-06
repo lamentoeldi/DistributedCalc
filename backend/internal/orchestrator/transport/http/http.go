@@ -35,6 +35,8 @@ type Service interface {
 	Login(ctx context.Context, creds *models.UserCredentials) (*models.JWTTokens, error)
 	GetUserID(_ context.Context, token string) (string, error)
 
+	GetUser(ctx context.Context, id string) (*models.UserView, error)
+
 	middleware.Auth
 }
 
@@ -88,6 +90,10 @@ func NewServer(cfg *Config, s Service, log *zap.Logger) *Server {
 		Handle(
 			"/api/v1/login",
 			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleLogin))))
+	t.mux.
+		Handle(
+			"/api/v1/authorize",
+			middleware.MwLogger(log, middleware.MwRecover(log, http.HandlerFunc(t.handleAuthorize))))
 
 	return t
 }
@@ -347,6 +353,44 @@ func (t *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		t.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (t *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+	defer cancel()
+
+	if r.Method != http.MethodPost {
+		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+	}
+
+	defer r.Body.Close()
+
+	authorization := r.Header.Get("Authorization")
+	if len(authorization) < len("Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accessToken := strings.TrimPrefix(authorization, "Bearer ")
+
+	userID, err := t.s.GetUserID(ctx, accessToken)
+	if err != nil {
+		t.log.Error("failed to get user id", zap.Error(err))
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := t.s.GetUser(ctx, userID)
+	if err != nil {
+		t.log.Error("failed to get user", zap.Error(err))
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+	}
+
+	err = json.NewEncoder(w).Encode(user)
+	if err != nil {
+		t.log.Error(err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }
 
