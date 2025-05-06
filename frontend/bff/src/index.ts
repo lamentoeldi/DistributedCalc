@@ -83,9 +83,8 @@ const auth = new Elysia()
                 return
             }
 
-            console.log("log res data: ", await res.json())
             const data: {
-                user_id: string,
+                id: string,
                 username: string
             } = await res.json()
 

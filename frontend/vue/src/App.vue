@@ -111,10 +111,6 @@ const collapsed = ref(true)
 
 const userStore = useUserStore()
 onMounted(userStore.fetchUser)
-console.log("userStore DEBUG: ", userStore)
-console.log("userID DEBUG: ", userStore.userID)
-console.log("username DEBUG: ", userStore.username)
-console.log("isAuthorized DEBUG: ", userStore.isAuthorized)
 </script>
 
 <template>
