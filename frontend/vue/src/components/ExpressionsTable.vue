@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import {
-  defineProps,
-  ref
-} from 'vue'
-
+import { ref, onMounted } from 'vue'
 import {
   NTag,
   NPagination,
@@ -11,56 +7,55 @@ import {
   NIcon,
   useMessage
 } from 'naive-ui'
+import { RefreshOutline as RefreshIcon } from '@vicons/ionicons5'
+import { treaty } from '@elysiajs/eden'
+import type { App } from 'bff/src'
 
-import {
-  RefreshOutline as RefreshIcon
-} from '@vicons/ionicons5'
-
-let expressions = (() =>
-    Array.from({ length: 15 }, (_, i) => ({
-      id: `${i + 1}`,
-      expression: '1+3+2',
-      result: 12,
-      status: ['completed', 'failed', 'pending'][(i % 3)],
-    }))
-)()
+const msg = useMessage()
+const defaultFetchLimit = 30
 
 const chunkArray = <T>(array: T[], size: number): T[][] =>
     array.reduce((acc, val, i) => {
       if (i % size === 0) acc.push([])
       acc[acc.length - 1].push(val)
-      return acc;
+      return acc
     }, [] as T[][])
 
-const msg = useMessage()
+const expressions = ref<{ id: string, result: number, status: string }[]>([])
+const expsToRender = ref<{ id: string, result: number, status: string }[][]>([])
+const page = ref(1)
+const pages = ref(0)
 
-const fetchExps = async () => {
-  let loading = msg.loading("Fetching more expressions...")
+const fetchExpressions = async () => {
+  const app = treaty<App>(window.location.origin)
+  const loading = msg.loading("Fetching expressions...")
 
-  const newExps = (() =>
-      Array.from({ length: 15 }, (_, i) => ({
-        id: `${i + 1}`,
-        expression: '1+3+2',
-        result: 12,
-        status: ['completed', 'failed', 'pending'][(i % 3)],
-      }))
-  )()
+  try {
+    const { data, error } = await app.bff.api.v1.expressions.get({
+      query: {
+        limit: defaultFetchLimit,
+        cursor: expressions.value.length > 0
+            ? expressions.value[expressions.value.length - 1].id
+            : ""
+      }
+    })
 
-  loading.destroy()
-  msg.success("New expressions fetched")
+    if (!data || error) {
+      throw error
+    }
 
-  expressions = expressions.concat(newExps)
-
-  expsToRender.value = chunkArray(expressions, 7)
-  pages.value = expsToRender.value.length
+    msg.success("New expressions fetched")
+    expressions.value = expressions.value.concat(data.expressions)
+    expsToRender.value = chunkArray(expressions.value, 7)
+    pages.value = expsToRender.value.length
+  } catch (e) {
+    msg.error("Failed to fetch expressions. Try again later")
+  } finally {
+    loading.destroy()
+  }
 }
 
-let expsToRender = ref(chunkArray(
-    expressions, 7
-))
-
-const page = ref(1)
-const pages = ref(expsToRender.value.length)
+onMounted(fetchExpressions)
 </script>
 
 <template>
@@ -73,9 +68,6 @@ const pages = ref(expsToRender.value.length)
               ID
             </th>
             <th>
-              Expression
-            </th>
-            <th>
               Result
             </th>
             <th>
@@ -86,7 +78,6 @@ const pages = ref(expsToRender.value.length)
         <tbody>
           <tr v-for="expression in expsToRender[page-1]" :key="expression.id">
             <td>{{ expression.id }}</td>
-            <td>{{ expression.expression }}</td>
             <td>{{ expression.result }}</td>
             <td>
               <n-tag v-if="expression.status.toLowerCase()==='completed'" type="success">{{expression.status}}</n-tag>
@@ -99,7 +90,7 @@ const pages = ref(expsToRender.value.length)
     </div>
     <div class="flex justify-center items-center">
       <n-pagination v-model:page="page" :page-count="pages"/>
-      <n-button text @click="fetchExps">
+      <n-button text @click="fetchExpressions">
         <n-icon>
           <RefreshIcon/>
         </n-icon>

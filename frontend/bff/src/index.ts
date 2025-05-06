@@ -9,6 +9,9 @@ const logger = new Elysia()
     .onRequest(({ request }) => {
         console.log(`received request ${request.url}`)
     })
+    .onError(({ code, error }) => {
+        console.log("err: ", code, error)
+    })
 
 const auth = new Elysia()
     .post(
@@ -143,7 +146,7 @@ const calculator = new Elysia()
             } else if (cursor) {
                 url += `?cursor=${cursor}`
             } else if (limit) {
-                url += `?limit=${limit.length}`
+                url += `?limit=${limit}`
             }
 
             const res = await fetch(url, {
@@ -181,6 +184,12 @@ const calculator = new Elysia()
             } = await res.json()
 
             return data
+        },
+        {
+            query: t.Object({
+                cursor: t.String(),
+                limit: t.Number()
+            })
         }
     )
     .get("/bff/api/v1/expressions/:id", async ({ params: { id }, cookie: { access_token, refresh_token }}) => {
