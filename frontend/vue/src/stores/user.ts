@@ -12,6 +12,8 @@ export const useUserStore = defineStore('user', () => {
     const app = treaty<App>(window.location.origin)
 
     const { data, error } = await app.bff.api.v1.authorize.get()
+    console.log("data DEBUG: ", data)
+    console.log("error DEBUG: ", error)
     if (!data || error) {
       return
     }

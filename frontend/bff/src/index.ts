@@ -70,10 +70,10 @@ const auth = new Elysia()
         "/bff/api/v1/authorize",
         async ({ cookie: { access_token, refresh_token } } ) => {
             const res = await fetch(`http://${backend_host}:${backend_port}/api/v1/authorize`, {
+                method: "GET",
                 headers: {
                     'Authorization': `Bearer ${access_token.value}`,
                     'Refresh-Token': `${refresh_token.value}`,
-                    'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 }
             })
@@ -83,6 +83,7 @@ const auth = new Elysia()
                 return
             }
 
+            console.log("log res data: ", await res.json())
             const data: {
                 user_id: string,
                 username: string

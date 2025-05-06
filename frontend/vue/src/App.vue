@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {RouterLink, RouterView} from 'vue-router'
 import type { Component } from "vue";
-import { h, ref } from 'vue'
+import { h, ref, onMounted } from 'vue'
 import {
   NIcon,
   NMenu,
@@ -110,7 +110,11 @@ const menuOptions = [
 const collapsed = ref(true)
 
 const userStore = useUserStore()
-userStore.fetchUser()
+onMounted(userStore.fetchUser)
+console.log("userStore DEBUG: ", userStore)
+console.log("userID DEBUG: ", userStore.userID)
+console.log("username DEBUG: ", userStore.username)
+console.log("isAuthorized DEBUG: ", userStore.isAuthorized)
 </script>
 
 <template>
