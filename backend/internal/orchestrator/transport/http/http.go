@@ -360,8 +360,9 @@ func (t *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
 	defer cancel()
 
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodGet {
 		http.Error(w, methodNotAllowed, http.StatusMethodNotAllowed)
+		return
 	}
 
 	defer r.Body.Close()
