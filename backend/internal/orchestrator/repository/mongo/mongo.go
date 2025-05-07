@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	errors2 "github.com/distributed-calc/v1/internal/orchestrator/errors"
 	"github.com/distributed-calc/v1/internal/orchestrator/models"
 	mongo2 "github.com/distributed-calc/v1/pkg/mongo"
 	"go.mongodb.org/mongo-driver/bson"
@@ -36,6 +37,12 @@ func (r *Repository) AddUser(ctx context.Context, user *models.User) error {
 		Collection(collUsers).
 		InsertOne(ctx, user)
 	if err != nil {
+		var e mongo.WriteException
+		if errors.As(err, &e) {
+			if e.HasErrorCode(11000) {
+				return fmt.Errorf("failed to add user: %w", errors2.ErrUserAlreadyExists)
+			}
+		}
 		return fmt.Errorf("failed to add user: %w", err)
 	}
 
@@ -77,12 +84,18 @@ func (r *Repository) Get(ctx context.Context, id string) (*models.Expression, er
 		Database(r.cfg.DBName).
 		Collection(collExp).
 		FindOne(ctx, bson.M{"_id": id})
-	if res.Err() != nil {
-		return nil, fmt.Errorf("failed to get exp: %w", res.Err())
+	err := res.Err()
+	if err != nil {
+		switch {
+		case errors.Is(err, mongo.ErrNoDocuments):
+			return nil, fmt.Errorf("failed to get exp: %w: expression not found", sql.ErrNoRows)
+		default:
+			return nil, fmt.Errorf("failed to get exp: %w", res.Err())
+		}
 	}
 
 	var exp models.Expression
-	err := res.Decode(&exp)
+	err = res.Decode(&exp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get exp: %w", err)
 	}

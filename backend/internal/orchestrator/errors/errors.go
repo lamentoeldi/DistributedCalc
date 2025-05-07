@@ -10,4 +10,5 @@ var (
 	ErrUnauthorized           = errors.New("unauthorized")
 	ErrBadRequest             = errors.New("bad request")
 	ErrConflict               = errors.New("conflict")
+	ErrUserAlreadyExists      = errors.New("this login has already been registered")
 )

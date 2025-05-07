@@ -18,6 +18,7 @@ services:
       - MONGO_USER=dev
       - MONGO_PASSWORD=dev
       - MONGO_NAME=local
+      - MONGO_MIGRATIONS_PATH=/migrations
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:

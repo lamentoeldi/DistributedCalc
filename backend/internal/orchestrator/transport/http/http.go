@@ -203,7 +203,7 @@ func (t *Server) handleExpressions(w http.ResponseWriter, r *http.Request) {
 
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			http.Error(w, err.Error(), http.StatusNotFound)
+			http.Error(w, "no expressions with requested parameters found", http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -308,8 +308,8 @@ func (t *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, e.ErrBadRequest):
 			http.Error(w, err.Error(), http.StatusBadRequest)
-		case errors.Is(err, e.ErrConflict):
-			http.Error(w, err.Error(), http.StatusConflict)
+		case errors.Is(err, e.ErrUserAlreadyExists):
+			http.Error(w, "login was already registered", http.StatusConflict)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
