@@ -7,12 +7,16 @@ import {
   NIcon,
   useMessage
 } from 'naive-ui'
-import { RefreshOutline as RefreshIcon } from '@vicons/ionicons5'
+import {
+  RefreshOutline as RefreshIcon,
+  AddOutline as PlusIcon
+} from '@vicons/ionicons5'
 import { treaty } from '@elysiajs/eden'
 import type { App } from 'bff/src'
 
 const msg = useMessage()
 const defaultFetchLimit = 30
+const defaultExpsShown = 5
 
 const chunkArray = <T>(array: T[], size: number): T[][] =>
     array.reduce((acc, val, i) => {
@@ -26,36 +30,85 @@ const expsToRender = ref<{ id: string, result: number, status: string }[][]>([])
 const page = ref(1)
 const pages = ref(0)
 
-const fetchExpressions = async () => {
+const fetchExpressions = async ({
+                                  cursor,
+                                  limit
+                                }: { cursor: string; limit: number }): Promise<[data: any | null, err: Error | null]> => {
   const app = treaty<App>(window.location.origin)
-  const loading = msg.loading("Fetching expressions...")
 
   try {
-    const { data, error } = await app.bff.api.v1.expressions.get({
-      query: {
-        limit: defaultFetchLimit,
-        cursor: expressions.value.length > 0
-            ? expressions.value[expressions.value.length - 1].id
-            : ""
-      }
+    const { data, status } = await app.bff.api.v1.expressions.get({
+      query: { cursor, limit }
     })
-
-    if (!data || error) {
-      throw error
+    if (!data || status < 200 || status >= 300) {
+      return [null, new Error(status.toString())]
     }
 
-    msg.success("New expressions fetched")
-    expressions.value = expressions.value.concat(data.expressions)
-    expsToRender.value = chunkArray(expressions.value, 7)
-    pages.value = expsToRender.value.length
+    return [data, null]
   } catch (e) {
-    msg.error("Failed to fetch expressions. Try again later")
-  } finally {
-    loading.destroy()
+    return [null, e instanceof Error ? e : new Error("Unknown error")]
   }
 }
 
-onMounted(fetchExpressions)
+const refreshExpressions = async () => {
+  const loading = msg.loading("Refreshing expressions...")
+  const currentCount = expressions.value.length || defaultFetchLimit
+
+  const [data, err] = await fetchExpressions({ cursor: "", limit: currentCount })
+
+  if (err || !data) {
+    msg.error("Failed to refresh expressions.")
+    loading.destroy()
+    return
+  }
+
+  expressions.value = data.expressions
+  expsToRender.value = chunkArray(expressions.value, defaultExpsShown)
+  pages.value = expsToRender.value.length
+  page.value = 1
+
+  msg.success("Expressions refreshed.")
+  loading.destroy()
+}
+
+const getExpressions = async () => {
+  const loading = msg.loading("Fetching expressions...")
+
+  const lastId = expressions.value.length > 0
+      ? expressions.value[expressions.value.length - 1].id
+      : ""
+
+  const [data, err] = await fetchExpressions({ cursor: lastId, limit: defaultFetchLimit })
+
+  if (err || !data) {
+    loading.destroy()
+    msg.error("Failed to fetch expressions.")
+    return
+  }
+
+  expressions.value = expressions.value.concat(data.expressions)
+  expsToRender.value = chunkArray(expressions.value, defaultExpsShown)
+  pages.value = expsToRender.value.length
+
+  msg.success("Expressions fetched.")
+  loading.destroy()
+}
+
+onMounted(async () => {
+  const lastId = expressions.value.length > 0
+      ? expressions.value[expressions.value.length - 1].id
+      : ""
+
+  const [data, err] = await fetchExpressions({ cursor: lastId, limit: defaultFetchLimit })
+
+  if (err || !data) {
+    return
+  }
+
+  expressions.value = expressions.value.concat(data.expressions)
+  expsToRender.value = chunkArray(expressions.value, defaultExpsShown)
+  pages.value = expsToRender.value.length
+})
 </script>
 
 <template>
@@ -89,10 +142,15 @@ onMounted(fetchExpressions)
       </table>
     </div>
     <div class="flex justify-center items-center">
-      <n-pagination v-model:page="page" :page-count="pages"/>
-      <n-button text @click="fetchExpressions">
+      <n-button @click="refreshExpressions" class="rb">
         <n-icon>
           <RefreshIcon/>
+        </n-icon>
+      </n-button>
+      <n-pagination v-model:page="page" :page-count="pages"/>
+      <n-button @click="getExpressions" class="gb">
+        <n-icon>
+          <PlusIcon/>
         </n-icon>
       </n-button>
     </div>
@@ -100,8 +158,14 @@ onMounted(fetchExpressions)
 </template>
 
 <style scoped>
-  .n-button {
-    margin-left: 1em;
+  .rb, .gb {
+    margin: auto 0.7em auto 0.7em;
+  }
+  .rb {
+    font-size: 1.3em;
+  }
+  .gb {
+    font-size: 1.6em;
   }
   #table-div {
     width: 70%;

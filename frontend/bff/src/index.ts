@@ -112,7 +112,7 @@ const calculator = new Elysia()
                 return
             }
 
-            const access = res.headers.get("Access-Token")
+            const access = res.headers.get("Access")
             if (access !== null) {
                 access_token.value = access
                 access_token.httpOnly = true
@@ -120,7 +120,7 @@ const calculator = new Elysia()
 
             const refresh = res.headers.get("Refresh-Token")
             if (refresh !== null) {
-                refresh_token.httpOnly = true
+                refresh_token.value = refresh
                 refresh_token.httpOnly = true
             }
 
@@ -163,7 +163,7 @@ const calculator = new Elysia()
                 return
             }
 
-            const access = res.headers.get("Access-Token")
+            const access = res.headers.get("Access")
             if (access !== null) {
                 access_token.value = access
                 access_token.httpOnly = true
@@ -171,7 +171,7 @@ const calculator = new Elysia()
 
             const refresh = res.headers.get("Refresh-Token")
             if (refresh !== null) {
-                refresh_token.httpOnly = true
+                refresh_token.value = refresh
                 refresh_token.httpOnly = true
             }
 
@@ -207,7 +207,7 @@ const calculator = new Elysia()
             return
         }
 
-        const access = res.headers.get("Access-Token")
+        const access = res.headers.get("Access")
         if (access !== null) {
             access_token.value = access
             access_token.httpOnly = true
@@ -215,7 +215,7 @@ const calculator = new Elysia()
 
         const refresh = res.headers.get("Refresh-Token")
         if (refresh !== null) {
-            refresh_token.httpOnly = true
+            refresh_token.value = refresh
             refresh_token.httpOnly = true
         }
 
