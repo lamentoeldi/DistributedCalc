@@ -1,18 +1,20 @@
-FROM node:23-alpine3.20
+# Stage 1: build
+# Node image is used on build stage because vite requires some node.js API missing in bun
+FROM node:24-alpine3.20 AS build
 
 WORKDIR /app
 
-COPY package.json ./
-COPY package-lock.json ./
-
-RUN npm install
-
 COPY . .
 
-ARG BACKEND_URL
+RUN npm install && cd vue && npm run build-only
 
-RUN npm run build
+# Stage 2: image
+FROM oven/bun:1.0.5-alpine
+
+WORKDIR /app
+
+COPY --from=build /app/bff /app
 
 EXPOSE 3000
 
-ENTRYPOINT ["npm", "run", "start"]
+ENTRYPOINT ["bun", "run", "src/index.ts"]
