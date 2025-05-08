@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "@elysiajs/cookie": "^0.8.0",
-    "@elysiajs/static": "^1.2.0",
+    "@elysiajs/static": "^1.2.0"
   },
   "devDependencies": {
     "bun-types": "latest"
