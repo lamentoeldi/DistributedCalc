@@ -39,6 +39,15 @@ services:
       - ORCHESTRATOR_PORT=50051
     depends_on:
       - orchestrator
+  bff:
+    build:
+      dockerfile:
+        Dockerfile
+      context:
+        frontend
+    environment:
+      - BACKEND_HOST=orchestrator
+      - BACKEND_PORT=8080
   nginx:
     image: nginx:1.27.5-alpine
     volumes:
