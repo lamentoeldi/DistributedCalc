@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM golang:1.23.4-alpine3.21 AS build
+FROM golang:1.24.3-alpine3.21 AS build
 
 WORKDIR /app
 
@@ -18,6 +18,7 @@ FROM alpine:3.21
 WORKDIR /app
 
 COPY --from=build /app/orchestrator /app/orchestrator
+COPY --from=build /app/db/migrations/orchestrator /migrations
 
 EXPOSE 8080
 

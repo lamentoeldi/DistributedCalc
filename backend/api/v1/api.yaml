@@ -8,13 +8,26 @@ servers:
 tags:
   - name: Client API
     description: API for client requests
-  - name: Internal API
-    description: API for internal communication
+  - name: Auth
+    description: API for client authorization
 paths:
   /api/v1/calculate:
     post:
       tags:
         - Client API
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+            example: 'Bearer <access_token>'
+        - in: header
+          name: Refresh-Token
+          required: true
+          schema:
+            type: string
+            example: '<refresh_token>'
       requestBody:
         required: true
         content:
@@ -31,12 +44,27 @@ paths:
                 $ref: '#/components/schemas/CalculateResponse'
         400:
           description: Request body is invalid
+        401:
+          description: No JWT was provided with request
         422:
           description: Expression is invalid
   /api/v1/expressions:
     get:
       tags:
         - Client API
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+            example: 'Bearer <access_token>'
+        - in: header
+          name: Refresh-Token
+          required: true
+          schema:
+            type: string
+            example: '<refresh_token>'
       description: Get all expressions
       responses:
         200:
@@ -48,6 +76,8 @@ paths:
                 properties:
                   expressions:
                     $ref: '#/components/schemas/ExpressionsResponse'
+        401:
+          description: No JWT was provided
         404:
           description: No expressions are being processed
   /api/v1/expressions/{id}:
@@ -60,6 +90,19 @@ paths:
           required: true
           schema:
             type: integer
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+            example: 'Bearer <access_token>'
+        - in: header
+          name: Refresh-Token
+          required: true
+          schema:
+            type: string
+            example: '<refresh_token>'
+
       description: Get expression by ID
       responses:
         200:
@@ -73,53 +116,58 @@ paths:
                     $ref: '#/components/schemas/Expression'
         400:
           description: Invalid ID path parameter
+        401:
+          description: No JWT was provided
         404:
           description: Expression not found
-  /internal/task:
-    get:
+  /api/v1/register:
+    post:
       tags:
-        - Internal API
-      description: Get task to process
+        - Auth
+      requestBody:
+        required: true
+        $ref: '#/components/schemas/UserCredentials'
       responses:
         200:
-          description: Task successfully retrieved
+          description: Successful registration
+        400:
+          description: Invalid request body
+        409:
+          description: Login is already taken
+  /api/v1/login:
+    post:
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        $ref: '#/components/schemas/UserCredentials'
+      responses:
+        200:
+          description: Successful login
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  task:
-                    $ref: '#/components/schemas/Task'
-        404:
-          description: No tasks to process
-    post:
-      tags:
-        - Internal API
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CompletedTask'
-      description: Send task result to master node
-      responses:
-        200:
-          description: Result successfully sent
+                $ref: '#/components/schemas/JWTTokens'
         400:
           description: Invalid request body
-        404:
-          description: Task with provided id does not exist
-  /internal/ping:
-    get:
-      tags:
-        - Internal API
-      description: Ping master node to ensure it is running
-      responses:
-        200:
-          description: Master node is alive
-  
+        401:
+          description: Invalid credentials
 components:
   schemas:
+    UserCredentials:
+      type: object
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+    JWTTokens:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
     Expression:
       type: object
       properties:

@@ -1,4 +1,5 @@
 services:
+  # Services
   orchestrator:
     build:
       dockerfile:
@@ -18,6 +19,7 @@ services:
       - MONGO_USER=dev
       - MONGO_PASSWORD=dev
       - MONGO_NAME=local
+      - MONGO_MIGRATIONS_PATH=/migrations
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
@@ -39,16 +41,18 @@ services:
       - ORCHESTRATOR_PORT=50051
     depends_on:
       - orchestrator
-  frontend:
+  bff:
     build:
       dockerfile:
         Dockerfile
       context:
         frontend
-      args:
-        BACKEND_URL: http://orchestrator:8080
-    ports:
-      - '3000:3000'
+    environment:
+      - BACKEND_HOST=orchestrator
+      - BACKEND_PORT=8080
+
+  # Infrastructure
+  # Nginx is used as api gateway rather than load balancer
   nginx:
     image: nginx:1.27.5-alpine
     volumes:

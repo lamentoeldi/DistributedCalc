@@ -40,6 +40,7 @@ type ExpRepo interface {
 type UserRepo interface {
 	AddUser(ctx context.Context, user *models.User) error
 	GetUser(ctx context.Context, login string) (*models.User, error)
+	GetUserByID(ctx context.Context, id string) (*models.User, error)
 }
 
 type TaskRepo interface {
@@ -449,4 +450,16 @@ func (s *Service) GetUserID(_ context.Context, token string) (string, error) {
 	}
 
 	return claims.GetSubject()
+}
+
+func (s *Service) GetUser(ctx context.Context, userID string) (*models.UserView, error) {
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return &models.UserView{
+		Id:       user.Id,
+		Username: user.Username,
+	}, nil
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	errors2 "github.com/distributed-calc/v1/internal/orchestrator/errors"
 	"github.com/distributed-calc/v1/internal/orchestrator/models"
 	mongo2 "github.com/distributed-calc/v1/pkg/mongo"
 	"go.mongodb.org/mongo-driver/bson"
@@ -30,19 +31,25 @@ func NewMongoRepository(cfg *mongo2.Config, client *mongo.Client) *Repository {
 	}
 }
 
-func (r Repository) AddUser(ctx context.Context, user *models.User) error {
+func (r *Repository) AddUser(ctx context.Context, user *models.User) error {
 	_, err := r.client.
 		Database(r.cfg.DBName).
 		Collection(collUsers).
 		InsertOne(ctx, user)
 	if err != nil {
+		var e mongo.WriteException
+		if errors.As(err, &e) {
+			if e.HasErrorCode(11000) {
+				return fmt.Errorf("failed to add user: %w", errors2.ErrUserAlreadyExists)
+			}
+		}
 		return fmt.Errorf("failed to add user: %w", err)
 	}
 
 	return nil
 }
 
-func (r Repository) GetUser(ctx context.Context, login string) (*models.User, error) {
+func (r *Repository) GetUser(ctx context.Context, login string) (*models.User, error) {
 	res := r.client.
 		Database(r.cfg.DBName).
 		Collection(collUsers).
@@ -60,7 +67,7 @@ func (r Repository) GetUser(ctx context.Context, login string) (*models.User, er
 	return &user, nil
 }
 
-func (r Repository) Add(ctx context.Context, exp *models.Expression) error {
+func (r *Repository) Add(ctx context.Context, exp *models.Expression) error {
 	_, err := r.client.
 		Database(r.cfg.DBName).
 		Collection(collExp).
@@ -72,17 +79,23 @@ func (r Repository) Add(ctx context.Context, exp *models.Expression) error {
 	return nil
 }
 
-func (r Repository) Get(ctx context.Context, id string) (*models.Expression, error) {
+func (r *Repository) Get(ctx context.Context, id string) (*models.Expression, error) {
 	res := r.client.
 		Database(r.cfg.DBName).
 		Collection(collExp).
 		FindOne(ctx, bson.M{"_id": id})
-	if res.Err() != nil {
-		return nil, fmt.Errorf("failed to get exp: %w", res.Err())
+	err := res.Err()
+	if err != nil {
+		switch {
+		case errors.Is(err, mongo.ErrNoDocuments):
+			return nil, fmt.Errorf("failed to get exp: %w: expression not found", sql.ErrNoRows)
+		default:
+			return nil, fmt.Errorf("failed to get exp: %w", res.Err())
+		}
 	}
 
 	var exp models.Expression
-	err := res.Decode(&exp)
+	err = res.Decode(&exp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get exp: %w", err)
 	}
@@ -90,7 +103,7 @@ func (r Repository) Get(ctx context.Context, id string) (*models.Expression, err
 	return &exp, nil
 }
 
-func (r Repository) GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error) {
+func (r *Repository) GetAll(ctx context.Context, userID, cursor string, limit int64) ([]*models.Expression, error) {
 	res, err := r.client.
 		Database(r.cfg.DBName).
 		Collection(collExp).
@@ -127,7 +140,25 @@ func (r Repository) GetAll(ctx context.Context, userID, cursor string, limit int
 	return expressions, nil
 }
 
-func (r Repository) Update(ctx context.Context, exp *models.Expression) error {
+func (r *Repository) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+	res := r.client.
+		Database(r.cfg.DBName).
+		Collection(collUsers).
+		FindOne(ctx, bson.M{"_id": id})
+	if res.Err() != nil {
+		return nil, fmt.Errorf("failed to get user: %w", res.Err())
+	}
+
+	var user models.User
+	err := res.Decode(&user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return &user, nil
+}
+
+func (r *Repository) Update(ctx context.Context, exp *models.Expression) error {
 	_, err := r.client.
 		Database(r.cfg.DBName).
 		Collection(collExp).
@@ -143,7 +174,7 @@ func (r Repository) Update(ctx context.Context, exp *models.Expression) error {
 	return nil
 }
 
-func (r Repository) AddTasks(ctx context.Context, tasks []*models.Task) error {
+func (r *Repository) AddTasks(ctx context.Context, tasks []*models.Task) error {
 	docs := make([]interface{}, 0, len(tasks))
 	for _, task := range tasks {
 		docs = append(docs, task)
@@ -160,7 +191,7 @@ func (r Repository) AddTasks(ctx context.Context, tasks []*models.Task) error {
 	return nil
 }
 
-func (r Repository) GetTask(ctx context.Context) (*models.Task, error) {
+func (r *Repository) GetTask(ctx context.Context) (*models.Task, error) {
 	res := r.client.
 		Database(r.cfg.DBName).
 		Collection(collTasks).
@@ -182,7 +213,7 @@ func (r Repository) GetTask(ctx context.Context) (*models.Task, error) {
 	return &task, nil
 }
 
-func (r Repository) UpdateTask(ctx context.Context, task *models.Task) error {
+func (r *Repository) UpdateTask(ctx context.Context, task *models.Task) error {
 	session, err := r.client.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to start session: %w", err)
@@ -264,7 +295,7 @@ func (r Repository) UpdateTask(ctx context.Context, task *models.Task) error {
 	return nil
 }
 
-func (r Repository) DeleteTasks(ctx context.Context, expID string) error {
+func (r *Repository) DeleteTasks(ctx context.Context, expID string) error {
 	_, err := r.client.
 		Database(r.cfg.DBName).
 		Collection(collTasks).

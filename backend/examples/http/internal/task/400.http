@@ -1,6 +1,0 @@
-POST http://localhost:8080/internal/task
-Content-Type: application/json
-
-{
-  "corrupted json
-}

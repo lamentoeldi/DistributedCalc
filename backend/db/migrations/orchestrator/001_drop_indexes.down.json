@@ -1,0 +1,6 @@
+[
+  {
+    "dropIndexes": "users",
+    "index": "idx_users_by_email"
+  }
+]
