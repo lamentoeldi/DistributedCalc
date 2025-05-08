@@ -220,7 +220,7 @@ const calculator = new Elysia()
         }
 
         const data: {
-            expressions: {
+            expression: {
                 id: string
                 status: string
                 result: number

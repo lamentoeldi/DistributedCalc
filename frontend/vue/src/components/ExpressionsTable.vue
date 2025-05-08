@@ -33,32 +33,38 @@ const pages = ref(0)
 const fetchExpressions = async ({
                                   cursor,
                                   limit
-                                }: { cursor: string; limit: number }): Promise<[data: any | null, err: Error | null]> => {
+                                }: { cursor: string; limit: number }): Promise<[data: any | null, status: number]> => {
   const app = treaty<App>(window.location.origin)
 
-  try {
-    const { data, status } = await app.bff.api.v1.expressions.get({
-      query: { cursor, limit }
-    })
-    if (!data || status < 200 || status >= 300) {
-      return [null, new Error(status.toString())]
-    }
-
-    return [data, null]
-  } catch (e) {
-    return [null, e instanceof Error ? e : new Error("Unknown error")]
+  const { data, status } = await app.bff.api.v1.expressions.get({
+    query: { cursor, limit }
+  })
+  if (!data || (status < 200 || status > 299)) {
+    return [null, status]
   }
+
+  return [data, status]
 }
 
 const refreshExpressions = async () => {
   const loading = msg.loading("Refreshing expressions...")
   const currentCount = expressions.value.length || defaultFetchLimit
 
-  const [data, err] = await fetchExpressions({ cursor: "", limit: currentCount })
+  const [data, status] = await fetchExpressions({ cursor: "", limit: currentCount })
 
-  if (err || !data) {
-    msg.error("Failed to refresh expressions.")
+  if ((status > 299 || status < 200) || !data) {
     loading.destroy()
+
+    switch(status) {
+      case 401:
+        msg.error("Unauthorized")
+        break
+      case 404:
+        msg.error("No expressions were found")
+        break
+      default:
+        msg.error("Unknown error occurred")
+    }
     return
   }
 
@@ -78,11 +84,21 @@ const getExpressions = async () => {
       ? expressions.value[expressions.value.length - 1].id
       : ""
 
-  const [data, err] = await fetchExpressions({ cursor: lastId, limit: defaultFetchLimit })
+  const [data, status] = await fetchExpressions({ cursor: lastId, limit: defaultFetchLimit })
 
-  if (err || !data) {
+  if ((status > 299 || status < 200) || !data) {
     loading.destroy()
-    msg.error("Failed to fetch expressions.")
+
+    switch(status) {
+      case 401:
+        msg.error("Unauthorized")
+        break
+      case 404:
+        msg.error("No expressions were found")
+        break
+      default:
+        msg.error("Unknown error occurred")
+    }
     return
   }
 
@@ -99,9 +115,9 @@ onMounted(async () => {
       ? expressions.value[expressions.value.length - 1].id
       : ""
 
-  const [data, err] = await fetchExpressions({ cursor: lastId, limit: defaultFetchLimit })
+  const [data, status] = await fetchExpressions({ cursor: lastId, limit: defaultFetchLimit })
 
-  if (err || !data) {
+  if ((status > 299 || status < 200) || !data) {
     return
   }
 

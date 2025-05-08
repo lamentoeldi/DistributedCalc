@@ -23,15 +23,25 @@ const sendForm = async () => {
   if (isRegisterForm.value) {
     let loading = msg.loading("Processing registration...")
 
-    const { error } = await app.bff.api.v1.register.post({
+    const { status } = await app.bff.api.v1.register.post({
       login: username.value,
       password: password.value
     })
 
     loading.destroy()
 
-    if (error) {
-      msg.error("Registration failed. Try again later")
+    if (status < 200 || status > 299) {
+      switch (status) {
+        case 400:
+          msg.error("Invalid credentials")
+          break
+        case 409:
+          msg.error("This username was already registered")
+          break
+        case 500:
+          msg.error("Unknown error occurred")
+          break
+      }
       return
     }
 
@@ -39,7 +49,7 @@ const sendForm = async () => {
   } else {
     let loading = msg.loading("Processing authorization...")
 
-    const { error } = await app.bff.api.v1.login.post({
+    const { status } = await app.bff.api.v1.login.post({
       login: username.value,
       password: password.value
     })
@@ -49,8 +59,16 @@ const sendForm = async () => {
 
     loading.destroy()
 
-    if (error) {
-      msg.error("Authorization failed. Try again later")
+    if (status < 200 || status > 299) {
+      switch (status) {
+        case 400:
+        case 401:
+        case 404:
+          msg.error("Invalid credentials")
+          break
+        case 500:
+          msg.error("Unknown error occurred")
+      }
       return
     }
 

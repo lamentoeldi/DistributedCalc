@@ -1,7 +1,4 @@
 <script setup lang="ts">
-import {
-  NSpace
-} from 'naive-ui'
 import ExpressionsTable from "@/components/ExpressionsTable.vue";
 </script>
 
