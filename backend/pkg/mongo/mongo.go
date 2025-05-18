@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/mongodb"
@@ -86,7 +87,7 @@ func NewMongoClient(ctx context.Context) (*mongo.Client, error) {
 		}
 
 		err = migr.Up()
-		if err != nil {
+		if err != nil && !errors.Is(err, migrate.ErrNoChange) {
 			return nil, fmt.Errorf("failed to run migrations: %w", err)
 		}
 	}
