@@ -61,6 +61,8 @@ services:
       - '8080:80'
     depends_on:
       - orchestrator
+      - bff
+    restart: on-failure
   mongo:
     image: mongo:latest
     environment:
